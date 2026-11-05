@@ -58,3 +58,6 @@ cmake-build-*/
 .idea/
 .cache/
 tools/matching/
+
+# Wide cockpit art generated from the original game data (not redistributable)
+resources/cockpit/

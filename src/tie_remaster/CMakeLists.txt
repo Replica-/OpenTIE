@@ -2,6 +2,7 @@
 add_library(tie_remaster STATIC
     remaster.c
     capture.c
+    flight/cockpit/wide_png.c
     flight/cockpit/renderer.c
     flight/cockpit/layout.c
     flight/cockpit/text.c

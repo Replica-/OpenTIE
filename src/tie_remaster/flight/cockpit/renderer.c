@@ -33,6 +33,7 @@
 #include "tie_runtime/flight_assets/assets.h"
 #include "tie_runtime/flight_assets/source.h"
 #include "tie_runtime/presentation/presentation.h"
+#include "tie_remaster/flight/cockpit/wide_png.h"
 #include "tie_runtime/snapshot/snapshot.h"
 
 #define COCKPIT_MAX_CACHED 8
@@ -87,6 +88,11 @@ typedef struct TieCockpitRendererEntry {
 	bool tried_damage;
 	AeronRuntimeAtlas original_parts;
 	bool original_assets;
+	/* Optional authored 16:9 base art (resources/cockpit/<view>_wide.png). 1 PNG px = 1 classic px; the
+	 * original 640-wide frame sits in the middle. */
+	AeronTexture* wide_tex;
+	int wide_w, wide_h;
+	bool tried_wide;
 } TieCockpitRendererEntry;
 
 /* One cached PIP CRT mask: the (variant, classic_w) selector matches
@@ -172,6 +178,7 @@ struct TieCockpitRenderer {
 		uint8_t covers_allowed;
 		int coord_w, coord_h;
 		int rt_w, rt_h;
+		int layout_flags; /* widescreen / centered messages / wide base art */
 	} chrome_key;
 	TieCockpitRendererEntry entries[COCKPIT_MAX_CACHED];
 	int entry_count;
@@ -474,6 +481,8 @@ void TieCockpitRenderer_SetFlightRenderer(TieCockpitRenderer* cg, struct TieFlig
 static void TieCockpitRenderer_ReleaseEntry(TieCockpitRendererEntry* entry) {
 	if (entry->base_tex)
 		Aeron_DestroyTexture(entry->base_tex);
+	if (entry->wide_tex)
+		Aeron_DestroyTexture(entry->wide_tex);
 	if (entry->original_assets)
 		Aeron_RuntimeAtlasRelease(&entry->original_parts);
 	else if (entry->parts_tex)
@@ -585,10 +594,32 @@ typedef struct TieCockpitRendererViewport {
 	float x, y, w, h;
 } TieCockpitRendererViewport;
 
+/* True when this entry draws authored 16:9 base art (see TieCockpitRendererEntry.wide_tex). The art
+ * assumes the bottom message bar is gone, so it is only used with centered messages. */
+static bool TieCockpitRenderer_UseWideBase(const TieCockpitRendererEntry* entry) {
+	return entry && entry->wide_tex && TiePresentation_Widescreen() && TiePresentation_CenteredMessages();
+}
+
+static int TieCockpitRenderer_LayoutFlags(const TieCockpitRendererEntry* entry) {
+	return (TiePresentation_Widescreen() ? 1 : 0) | (TiePresentation_CenteredMessages() ? 2 : 0) |
+		   (TieCockpitRenderer_UseWideBase(entry) ? 4 : 0);
+}
+
 static void TieCockpitRenderer_CockpitFitViewport(int coord_w, int coord_h, int rt_w, int rt_h,
+												  const TieCockpitRendererEntry* entry,
 												  TieCockpitRendererViewport* out) {
 	if (TiePresentation_Widescreen() && TieCockpitCommon_IsClassic4x3(coord_w, coord_h)) {
-		/* Widescreen: stretch the 4:3 cockpit art across the whole render target; the world is not stretched. */
+		if (TieCockpitRenderer_UseWideBase(entry)) {
+			/* Authored wide art: the classic 4:3 frame keeps its proportions in the middle (HUD stays aligned
+			 * with the art) and the art itself fills the rest of the width. */
+			out->h = (float)rt_h / TIE_COCKPIT_ART_HEIGHT_FRACTION;
+			out->w = out->h * (4.0f / 3.0f);
+			out->x = ((float)rt_w - out->w) * 0.5f;
+			out->y = 0.0f;
+			return;
+		}
+		/* No authored art: stretch the 4:3 cockpit art across the whole render target; the world is not
+		 * stretched. */
 		out->x = 0.0f;
 		out->y = 0.0f;
 		out->w = (float)rt_w;
@@ -615,9 +646,10 @@ static void TieCockpitRenderer_CockpitFitViewport(int coord_w, int coord_h, int 
 }
 
 static TieCockpitRendererDrawSpace TieCockpitRenderer_CockpitDrawSpace(int coord_w, int coord_h, int target_w,
-																	   int target_h) {
+																	   int target_h,
+																	   const TieCockpitRendererEntry* entry) {
 	TieCockpitRendererViewport fit;
-	TieCockpitRenderer_CockpitFitViewport(coord_w, coord_h, target_w, target_h, &fit);
+	TieCockpitRenderer_CockpitFitViewport(coord_w, coord_h, target_w, target_h, entry, &fit);
 	return (TieCockpitRendererDrawSpace) {
 		.target_w = target_w,
 		.target_h = target_h,
@@ -1078,10 +1110,49 @@ static bool TieCockpitRenderer_EnsureOriginalCockpitAssets(TieCockpitRenderer* c
 	return TieCockpitRenderer_PrepareOriginalParts(cg, cmd, entry, snap, palette);
 }
 
+/* Optional authored 16:9 base art: resources/cockpit/<view>_wide.png, e.g. tieftr12_wide.png. One PNG
+ * pixel is one classic pixel, so it must be as tall as the original art (456 rows) and wider than 640;
+ * the original 640-wide frame is the middle of it. A missing or mismatched file just means the stretched
+ * original art is used. */
+static void TieCockpitRenderer_EnsureWideBase(TieCockpitRenderer* cg, AeronCommandBuffer* cmd,
+											  TieCockpitRendererEntry* entry, const TieSnapshot* snap) {
+	if (entry->tried_wide || !entry->base_tex || snap->cockpit.classic_w != 640)
+		return;
+	entry->tried_wide = true;
+	char path[96];
+	int length = snprintf(path, sizeof path, "cockpit/");
+	for (const char* name = snap->cockpit.view_name; *name && length < (int)sizeof path - 12; ++name)
+		path[length++] = (char)((*name >= 'A' && *name <= 'Z') ? *name + 32 : *name);
+	snprintf(path + length, sizeof path - (size_t)length, "_wide.png");
+	uint8_t* rgba = NULL;
+	int width = 0, height = 0;
+	if (!cg->assets || !TieWideCockpit_ReadPng(cg->assets->vfs, AERON_VFS_ROOT_RESOURCE, path, &rgba, &width, &height))
+		return;
+	if (height != entry->base_h || width < entry->base_w) {
+		Aeron_LogWarn("tie.cockpit", "%s is %dx%d; expected at least %d wide and exactly %d tall, ignoring it", path,
+					  width, height, entry->base_w, entry->base_h);
+		free(rgba);
+		return;
+	}
+	entry->wide_tex = Aeron_ImageUploadRgba8(cmd, rgba, width, height, (size_t)width * 4,
+											 AERON_TEXTURE_FORMAT_RGBA8_SRGB, AERON_COLOR_SPACE_SRGB,
+											 AERON_IMAGE_ALPHA_STRAIGHT, true, path);
+	free(rgba);
+	if (entry->wide_tex) {
+		entry->wide_w = width;
+		entry->wide_h = height;
+		Aeron_LogInfo("tie.cockpit", "using authored wide cockpit art %s (%dx%d)", path, width, height);
+	}
+}
+
 static bool TieCockpitRenderer_EnsureCockpitAssets(TieCockpitRenderer* cg, AeronCommandBuffer* cmd,
 												   TieCockpitRendererEntry* entry, const TieSnapshot* snap) {
-	if (cg->assets && !TieFlightAssetSource_IsRemastered(cg->assets))
-		return TieCockpitRenderer_EnsureOriginalCockpitAssets(cg, cmd, entry, snap);
+	if (cg->assets && !TieFlightAssetSource_IsRemastered(cg->assets)) {
+		if (!TieCockpitRenderer_EnsureOriginalCockpitAssets(cg, cmd, entry, snap))
+			return false;
+		TieCockpitRenderer_EnsureWideBase(cg, cmd, entry, snap);
+		return true;
+	}
 	const TieFlightAssetBundle* catalog = TieCockpitRenderer_Catalog(cg);
 	if (!catalog)
 		return TIE_COCKPIT_ASSET_ERROR("tie_remaster/flight/assets.yaml",
@@ -1245,6 +1316,16 @@ static void TieCockpitRenderer_DrawCockpitBase(TieCockpitRenderer* cg, AeronComm
 											   int coord_w, int coord_h, int cockpit_area_h, bool mirrored) {
 	if (!entry->base_tex)
 		return;
+	if (TieCockpitRenderer_UseWideBase(entry)) {
+		/* Authored wide art: one PNG pixel per classic pixel, centered on the 640-wide classic frame. The art
+		 * extends past the frame; the HUD keeps using the classic frame in the middle. */
+		const float u0 = mirrored ? 1.0f : 0.0f;
+		const float u1 = mirrored ? 0.0f : 1.0f;
+		TieCockpitRenderer_BlitCockpitQuad(cg, cmd, pass, entry->wide_tex, coord_w, coord_h,
+										   ((float)coord_w - (float)entry->wide_w) * 0.5f, 0.0f, (float)entry->wide_w,
+										   (float)entry->wide_h, u0, 0.0f, u1, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f);
+		return;
+	}
 	float base_coord_h = (float)cockpit_area_h;
 	if (entry->original_assets && entry->base_w > 0 && entry->base_h > 0)
 		base_coord_h = (float)entry->base_h * (float)coord_w / (float)entry->base_w;
@@ -1637,7 +1718,8 @@ static bool TieCockpitRenderer_ChromeKeyMatches(const TieCockpitRenderer* cg,
 		   cg->chrome_key.subsystem_active == snap->hud.subsystem_active &&
 		   cg->chrome_key.covers_allowed == snap->cockpit.covers_allowed &&
 		   cg->chrome_key.coord_w == coord_w && cg->chrome_key.coord_h == coord_h &&
-		   cg->chrome_key.rt_w == rt_w && cg->chrome_key.rt_h == rt_h;
+		   cg->chrome_key.rt_w == rt_w && cg->chrome_key.rt_h == rt_h &&
+		   cg->chrome_key.layout_flags == TieCockpitRenderer_LayoutFlags(entry);
 }
 
 /* Bake base bitmap + damage cracks + subsystem covers into chrome_rt at
@@ -1656,7 +1738,7 @@ static bool TieCockpitRenderer_BakeCockpitChrome(TieCockpitRenderer* cg, AeronCo
 
 	const int cockpit_area_h = (coord_h * 19) / 20;
 	static const float clear[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
-	cg->pending_space = TieCockpitRenderer_CockpitDrawSpace(coord_w, coord_h, rt_w, rt_h);
+	cg->pending_space = TieCockpitRenderer_CockpitDrawSpace(coord_w, coord_h, rt_w, rt_h, entry);
 	cg->record_list = cg->chrome_bake_list;
 	AeronDrawList_Begin(cg->chrome_bake_list, cg->chrome_rt, rt_w, rt_h, AERON_DRAWLIST2D_CLEAR, clear);
 	TIE_GPU_PUSH(cmd, "Cockpit chrome bake");
@@ -1685,6 +1767,7 @@ static bool TieCockpitRenderer_BakeCockpitChrome(TieCockpitRenderer* cg, AeronCo
 	cg->chrome_key.coord_h = coord_h;
 	cg->chrome_key.rt_w = rt_w;
 	cg->chrome_key.rt_h = rt_h;
+	cg->chrome_key.layout_flags = TieCockpitRenderer_LayoutFlags(entry);
 	cg->chrome_valid = true;
 	return true;
 }
@@ -2122,7 +2205,7 @@ static void TieCockpitRenderer_DrawMainTargetBox(TieCockpitRenderer* cg, AeronCo
 	int coord_w, coord_h;
 	TieCockpitRenderer_ResolveCoordFrame(entry, snap, &coord_w, &coord_h);
 	TieCockpitRendererViewport cockpit_vp;
-	TieCockpitRenderer_CockpitFitViewport(coord_w, coord_h, rt_w, rt_h, &cockpit_vp);
+	TieCockpitRenderer_CockpitFitViewport(coord_w, coord_h, rt_w, rt_h, entry, &cockpit_vp);
 	const float center_x_cl = (ship_px - cockpit_vp.x) * (float)coord_w / cockpit_vp.w;
 	const float center_y_cl = (ship_py - cockpit_vp.y) * (float)coord_h / cockpit_vp.h;
 	if (!look_1998) {
@@ -2341,9 +2424,15 @@ static void TieCockpitRenderer_DrawMessageBar(TieCockpitRenderer* cg, AeronComma
 				recs[0].y = 6;
 				++index;
 			}
-			/* Time-warp readout stays on screen, just above where the bar used to be. */
-			if (index < n_recs)
-				recs[index].y = (int16_t)((int)snap->hud.msg_bar.line_top - 14);
+			/* Time-warp readout: centered on the line under the message. */
+			if (index < n_recs) {
+				recs[index].font_id = FONT_MICRO64;
+				const float width = TieScene2dTextRenderer_MeasureFestringClassic(
+					cg->text_renderer, recs[index].font_domain, recs[index].font_id, &message_space,
+					recs[index].text);
+				recs[index].x = (int16_t)(((float)geometry.classic_w - width) * 0.5f);
+				recs[index].y = 18;
+			}
 		}
 		TieScene2dTextRenderer_RecordFestringScaled(
 			cg->text_renderer, cg->record_list, geometry.classic_w, geometry.classic_h, &message_space, recs,
@@ -2892,7 +2981,7 @@ bool TieCockpitRenderer_Prepare(TieCockpitRenderer* cg, AeronCommandBuffer* cmd,
 		return false;
 
 	cg->pending_entry = entry;
-	cg->pending_space = TieCockpitRenderer_CockpitDrawSpace(coord_w, coord_h, rt_w, rt_h);
+	cg->pending_space = TieCockpitRenderer_CockpitDrawSpace(coord_w, coord_h, rt_w, rt_h, entry);
 	cg->pending_ready = TieCockpitRenderer_CockpitRecordLists(cg, cmd, rt_w, rt_h, snap);
 	return cg->pending_ready;
 }
@@ -2903,7 +2992,7 @@ static bool TieCockpitRenderer_FlightHudRecordLists(TieCockpitRenderer* cg, Aero
 		return false;
 	int coord_w, coord_h;
 	TieCockpitRenderer_ResolveCoordFrame(NULL, snap, &coord_w, &coord_h);
-	cg->pending_space = TieCockpitRenderer_CockpitDrawSpace(coord_w, coord_h, rt_w, rt_h);
+	cg->pending_space = TieCockpitRenderer_CockpitDrawSpace(coord_w, coord_h, rt_w, rt_h, NULL);
 
 	TIE_GPU_PUSH(cmd, "Flight HUD");
 	AeronDrawList_Begin(cg->before_pip_list, NULL, rt_w, rt_h, AERON_DRAWLIST2D_LOAD, NULL);

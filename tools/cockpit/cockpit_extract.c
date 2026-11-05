@@ -178,6 +178,7 @@ typedef struct {
 	 * test for the runtime's HD cockpit path without authoring new art.
 	 * Outputs go to <out>/remaster/flight-16x9/cockpits/ so the 4:3 set isn't
 	 * touched. */
+	bool wide;              /* also emit <view>_wide.png: 16:9 art for the original-assets loader */
 	bool pillarbox_16x9;
 } TieCockpitExtractOptions;
 
@@ -436,13 +437,18 @@ static void TieCockpitExtract_Usage(const char* prog) {
 	fprintf(stderr,
 			"Usage: %s <cp640-dir> <vga.pac> <output-dir>\n"
 			"       [--craft NAME] [--rgba] [--no-upscale] [--no-png]\n"
-			"       [--validate-mask] [--16x9]\n"
+			"       [--validate-mask] [--16x9] [--wide]\n"
 			"\n"
 			"Default output: <output-dir>/remaster/flight/cockpits/<view>_640.{ktx2,png}\n"
 			"                                            /<craft>_parts.{ktx2,png}\n"
 			"                                            /<craft>_hud_layout.yaml\n"
 			"PNGs ship alongside KTX2 so the art team can hand-edit them.\n"
 			"Use --no-png to suppress PNGs (smaller output, KTX2-only).\n"
+			"\n"
+			"--wide: also write <output-dir>/wide/<view>_wide.png, a 16:9 version of each base\n"
+			"        bitmap: the original art stays pixel-identical in the middle and the\n"
+			"        edge pixels are extended sideways. Copy the files to resources/cockpit/\n"
+			"        (next to OpenTIE.exe) and repaint the extended edges by hand.\n"
 			"\n"
 			"--16x9: pillarbox the 4:3 cockpit into a 1920×1080 reference\n"
 			"        frame and emit the HD-cockpit YAML schema. Outputs land\n"
@@ -470,6 +476,8 @@ static void TieCockpitExtract_ParseOpts(int argc, char** argv, TieCockpitExtract
 			o->skip_png = true;
 		else if (!strcmp(argv[i], "--validate-mask"))
 			o->validate_mask = true;
+		else if (!strcmp(argv[i], "--wide"))
+			o->wide = true;
 		else if (!strcmp(argv[i], "--16x9"))
 			o->pillarbox_16x9 = true;
 		else
@@ -530,6 +538,68 @@ static bool TieCockpitExtract_EmitCockpitView(const TieCockpitExtractOptions* o,
 	int w = decoded_base.width, h = decoded_base.height;
 	if (rows < vh && rows > 0)
 		fprintf(stderr, "  warn: %s mask covers %d/%d rows (rest opaque)\n", view_name, rows, vh);
+
+	/* --wide: 811-px-wide 16:9 version of the original-size bitmap (one PNG pixel per classic pixel).
+	 * The original art stays pixel-identical in the middle so the HUD lines up; the margins repeat the
+	 * outermost column so they can be repainted by hand. 811 = 480 * 0.95 * 16 / 9: the classic frame
+	 * scaled so the art area fills the screen height. */
+	if (o->wide && w == 640) {
+		enum { WIDE_W = 811 };
+		const int pad_left = (WIDE_W - w) / 2;
+		uint8_t* wide = malloc((size_t)WIDE_W * (size_t)h * 4u);
+		if (wide) {
+			/* Margin fill: the average colour of the six outermost opaque columns on each side, so the
+			 * extension reads as plain dark cockpit panelling instead of streaks. A side with no opaque
+			 * pixels (views with a transparent edge) repeats the edge pixels. */
+			uint8_t side_color[2][4] = { { 0 } };
+			bool side_solid[2] = { false, false };
+			for (int side = 0; side < 2; ++side) {
+				unsigned long sum[3] = { 0, 0, 0 };
+				unsigned long count = 0;
+				for (int y = 0; y < h; ++y) {
+					for (int i = 0; i < 6; ++i) {
+						const uint8_t* pixel = rgba + ((size_t)y * (size_t)w + (size_t)(side ? w - 1 - i : i)) * 4u;
+						if (pixel[3] < 255)
+							continue;
+						sum[0] += pixel[0];
+						sum[1] += pixel[1];
+						sum[2] += pixel[2];
+						++count;
+					}
+				}
+				if (count > (unsigned long)h * 3) {
+					for (int c = 0; c < 3; ++c)
+						side_color[side][c] = (uint8_t)(sum[c] / count);
+					side_color[side][3] = 255;
+					side_solid[side] = true;
+				}
+			}
+			for (int y = 0; y < h; ++y) {
+				const uint8_t* source = rgba + (size_t)y * (size_t)w * 4u;
+				uint8_t* destination = wide + (size_t)y * WIDE_W * 4u;
+				for (int x = 0; x < WIDE_W; ++x) {
+					const int source_x = x - pad_left;
+					if (source_x >= 0 && source_x < w) {
+						memcpy(destination + (size_t)x * 4u, source + (size_t)source_x * 4u, 4u);
+					} else {
+						const int side = source_x < 0 ? 0 : 1;
+						if (side_solid[side])
+							memcpy(destination + (size_t)x * 4u, side_color[side], 4u);
+						else
+							memcpy(destination + (size_t)x * 4u, source + (size_t)(side ? w - 1 : 0) * 4u, 4u);
+					}
+				}
+			}
+			char wide_dir[1024], wide_name[16], wide_path[1024];
+			snprintf(wide_dir, sizeof wide_dir, "%s/wide", o->out_dir);
+			TieCockpitExtract_MakePath(wide_dir);
+			snprintf(wide_name, sizeof wide_name, "%s", view_name);
+			TieCockpitExtract_LowerStr(wide_name);
+			snprintf(wide_path, sizeof wide_path, "%s/%s_wide.png", wide_dir, wide_name);
+			write_png_rgba(wide_path, WIDE_W, h, wide);
+			free(wide);
+		}
+	}
 
 	/* Upscale unless --no-upscale. */
 	int out_w = w, out_h = h;

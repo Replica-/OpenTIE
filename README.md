@@ -73,6 +73,7 @@ Two flight display options are available under **Settings > Video > Display**:
   the cockpit artwork also extends down over the area the bar used to occupy.
 
 The classic (original renderer) view is disabled; `TAB` no longer switches to it.
+### Wide cockpit artBy default the original 4:3 cockpit art is stretched across the widescreen view. For an undistortedresult, OpenTIE loads authored 16:9 base art from `resources/cockpit/<view>_wide.png` (for example`tieftr12_wide.png`) next to `OpenTIE.exe`. The files must be 456 pixels tall, as in the original art,and 811 pixels wide. One pixel is one original pixel and the original 640-wide art sits in the middle,so the gauges stay aligned. They are used when Widescreen and Centered Messages are both on; a missingor wrongly sized file falls back to the stretched art.`cockpit_extract <CP640 dir> <VGA.PAC> <output dir> --no-upscale --no-png --rgba --wide` writes a startingpoint for every view to `<output dir>/wide/` with the sides filled with a flat colour. Repaint the sides byhand. These files are derived from the original game art, so do not redistribute them.
 
 ## Smoother flight
 
