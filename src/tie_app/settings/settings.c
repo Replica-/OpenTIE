@@ -632,7 +632,6 @@ static void TieSettings_DrawPathPicker(AeronUiContext* ui) {
 }
 
 static void TieSettings_GamePage(AeronUiContext* ui) {
-	static const char* const versions[] = { "TIE95", "TIE98" };
 	static const char* const renderers[] = { "Software", "Direct3D" };
 	static const char* const update_rates[] = { "Native", "TIE95", "Unlocked" };
 	static const char* const off_on[] = { "Off", "On" };
@@ -658,33 +657,9 @@ static void TieSettings_GamePage(AeronUiContext* ui) {
 		TieSettings_OpenInstallationPicker(TIE_GAME_VERSION_TIE98, launch.tie98_data);
 	launch_changed |= (path_result & AERON_UI_INPUT_TEXT_CHANGED) != 0;
 	AeronUi_Spacer(ui, 8.0f);
-	AeronUi_Header(ui, "Version Selection");
-	int frontend = launch.frontend_version;
-	int flight_version = launch.flight_version;
+	AeronUi_Header(ui, "Flight");
 	int renderer = flight.tie98_original_renderer;
 	int update_rate = flight.update_rate;
-	launch_changed |= AeronUi_Selector(ui, "Cutscenes and Menus", &frontend, versions, 2);
-	launch.frontend_version = (TieVersionSelection)frontend;
-	if (launch.frontend_version != TIE_VERSION_SELECTION_TIE95) {
-		int aspect = flight.aspect_correct_legacy_scenes;
-		if (AeronUi_Toggle(ui, "Aspect-correct 320x200 Scenes", &aspect)) {
-			flight.aspect_correct_legacy_scenes = aspect != 0;
-			flight_changed = true;
-		}
-	}
-	if (AeronUi_Selector(ui, "Flight Engine", &flight_version, versions, 2)) {
-		const TieVersionSelection selected = (TieVersionSelection)flight_version;
-		const bool installed =
-			selected == TIE_VERSION_SELECTION_TIE98 ? g_settings.has_tie98 : g_settings.has_tie95;
-		if (installed) {
-			launch.flight_version = selected;
-			launch_changed = true;
-		} else {
-			TieSettings_SettingsReportError(selected == TIE_VERSION_SELECTION_TIE98
-												? "The TIE98 installation was not available at startup."
-												: "The TIE95 installation was not available at startup.");
-		}
-	}
 	if (launch.flight_version != TIE_VERSION_SELECTION_TIE95) {
 		if (AeronUi_Selector(ui, "Classic Look", &renderer, renderers, 2)) {
 			flight.tie98_original_renderer = (Tie98OriginalRenderer)renderer;

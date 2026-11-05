@@ -21,7 +21,7 @@ ui:
   font: assets/fonts/menu
 
 frontend:
-  version: tie98
+  version: tie95
   aspect_correct_legacy_scenes: true
 
 flight:

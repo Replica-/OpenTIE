@@ -425,8 +425,6 @@ static bool TieAppConfig_ParseComplete(const AeronConfigFile* document,
 									   const AeronSceneTonemapSettings* baseline_tonemap, TieAppConfig* out,
 									   char* error, size_t capacity) {
 	memset(out, 0, sizeof *out);
-	const char* frontend_version;
-	const char* flight_version;
 	const char* model_source;
 	const char* original_renderer;
 	const char* update_rate;
@@ -479,22 +477,10 @@ static bool TieAppConfig_ParseComplete(const AeronConfigFile* document,
 	if (!TieAppConfig_ReadBool(document, "frontend.aspect_correct_legacy_scenes",
 							   &out->aspect_correct_legacy_scenes, error, capacity))
 		return false;
-	frontend_version = AeronConfigFile_GetString(document, "frontend.version", NULL);
-	flight_version = AeronConfigFile_GetString(document, "flight.version", NULL);
-	if (!frontend_version || !flight_version)
-		return TieAppConfig_ConfigError(error, capacity, "missing frontend.version or flight.version");
-	if (strcmp(frontend_version, "tie95") == 0)
-		out->frontend_version = TIE_VERSION_SELECTION_TIE95;
-	else if (strcmp(frontend_version, "tie98") == 0)
-		out->frontend_version = TIE_VERSION_SELECTION_TIE98;
-	else
-		return TieAppConfig_ConfigError(error, capacity, "invalid frontend.version '%s'", frontend_version);
-	if (strcmp(flight_version, "tie95") == 0)
-		out->flight_version = TIE_VERSION_SELECTION_TIE95;
-	else if (strcmp(flight_version, "tie98") == 0)
-		out->flight_version = TIE_VERSION_SELECTION_TIE98;
-	else
-		return TieAppConfig_ConfigError(error, capacity, "invalid flight.version '%s'", flight_version);
+	/* Menus and cutscenes are always TIE95 and flight is always TIE98. The legacy frontend.version and
+	 * flight.version keys are still accepted in existing files but ignored. */
+	out->frontend_version = TIE_VERSION_SELECTION_TIE95;
+	out->flight_version = TIE_VERSION_SELECTION_TIE98;
 	original_renderer = AeronConfigFile_GetString(document, "flight.original_renderer", NULL);
 	if (!original_renderer)
 		return TieAppConfig_ConfigError(error, capacity, "missing flight.original_renderer");

@@ -17,8 +17,6 @@ enum { TIE_SETUP_PILOT_FILE_SIZE = 3856 };
 
 typedef enum TieSetupPreset {
 	TIE_SETUP_PRESET_RECOMMENDED,
-	TIE_SETUP_PRESET_TIE95,
-	TIE_SETUP_PRESET_TIE98,
 	TIE_SETUP_PRESET_NONE,
 } TieSetupPreset;
 
@@ -50,20 +48,6 @@ static const TieSetupPresetDesc setup_presets[] = {
 		.flight = TIE_VERSION_SELECTION_TIE98,
 		.music = TIE_MUSIC_IMUSE,
 		.require_tie95 = true,
-		.require_tie98 = true,
-	},
-	[TIE_SETUP_PRESET_TIE95] = {
-		.label = "TIE Fighter - Collector's CD-ROM (1995)",
-		.frontend = TIE_VERSION_SELECTION_TIE95,
-		.flight = TIE_VERSION_SELECTION_TIE95,
-		.music = TIE_MUSIC_IMUSE,
-		.require_tie95 = true,
-	},
-	[TIE_SETUP_PRESET_TIE98] = {
-		.label = "TIE Fighter 1998",
-		.frontend = TIE_VERSION_SELECTION_TIE98,
-		.flight = TIE_VERSION_SELECTION_TIE98,
-		.music = TIE_MUSIC_TIE98,
 		.require_tie98 = true,
 	},
 };
@@ -231,7 +215,7 @@ static bool TieSetup_OpenSavedInstallation(TieInstallation* out, TieGameVersion 
 }
 
 static bool TieSetup_PresetAvailable(const TieSetupDialog* setup, TieSetupPreset preset) {
-	if (!setup || preset < TIE_SETUP_PRESET_RECOMMENDED || preset > TIE_SETUP_PRESET_TIE98)
+	if (!setup || preset < TIE_SETUP_PRESET_RECOMMENDED || preset > TIE_SETUP_PRESET_RECOMMENDED)
 		return false;
 	const TieSetupPresetDesc* desc = &setup_presets[preset];
 	return (!desc->require_tie95 || setup->installations->has_tie95) &&
@@ -241,10 +225,6 @@ static bool TieSetup_PresetAvailable(const TieSetupDialog* setup, TieSetupPreset
 static TieSetupPreset TieSetup_BestPreset(const TieInstallationSet* installations) {
 	if (installations->has_tie95 && installations->has_tie98)
 		return TIE_SETUP_PRESET_RECOMMENDED;
-	if (installations->has_tie95)
-		return TIE_SETUP_PRESET_TIE95;
-	if (installations->has_tie98)
-		return TIE_SETUP_PRESET_TIE98;
 	return TIE_SETUP_PRESET_NONE;
 }
 
@@ -390,13 +370,13 @@ static bool TieSetup_HasSc55(const TieSetupDialog* setup) {
 
 static void TieSetup_DrawSummary(AeronUiContext* ui, const TieSetupDialog* setup) {
 	const TieSetupPreset preset = setup->preset;
-	const TieSetupPresetDesc* desc = preset <= TIE_SETUP_PRESET_TIE98 ? &setup_presets[preset] : NULL;
+	const TieSetupPresetDesc* desc = preset <= TIE_SETUP_PRESET_RECOMMENDED ? &setup_presets[preset] : NULL;
 	const char* music = "-";
 	if (desc)
 		music = desc->music == TIE_MUSIC_TIE98 ? "CD Music"
 				: TieSetup_HasSc55(setup)      ? "iMUSE / SC-55"
 											   : "iMUSE / OPL3";
-	AeronUi_Header(ui, "Preset Settings");
+	AeronUi_Header(ui, "Configuration");
 	AeronUi_BeginColumns(ui, 2, (const float[]) { -280.0f, 1.0f });
 	AeronUi_Label(ui, "Cutscenes and Menus");
 	AeronUi_Label(ui, "Flight Engine");
@@ -413,7 +393,7 @@ static TieSetupFrameResult TieSetup_DrawWindow(TieSetupDialog* setup, AeronUiCon
 	const AeronUiWindowDesc window = { .width_ref = 920.0f, .height_ref = 940.0f, .centered = 1 };
 	if (!AeronUi_BeginWindow(ui, "Welcome to OpenTIE", &window))
 		return result;
-	AeronUi_Help(ui, "Select one or both original installations. For the best experience, select both.");
+	AeronUi_Help(ui, "OpenTIE uses the 1995 Collector's CD-ROM menus and cutscenes with the 1998 flight engine. Select both original installations.");
 	AeronUi_Spacer(ui, 8.0f);
 	AeronUi_Header(ui, "Original Installations");
 	uint32_t path_result = TieInstallation_PathRow(ui, "TIE Fighter CD 1995", setup->tie95_path,
@@ -436,22 +416,6 @@ static TieSetupFrameResult TieSetup_DrawWindow(TieSetupDialog* setup, AeronUiCon
 	}
 
 	AeronUi_Spacer(ui, 8.0f);
-	AeronUi_Header(ui, "Preset");
-	AeronUiListItem items[3];
-	for (size_t index = 0; index < 3; ++index) {
-		const TieSetupPreset preset = (TieSetupPreset)index;
-		items[index] = (AeronUiListItem) {
-			.id = index,
-			.label = setup_presets[index].label,
-			.flags = TieSetup_PresetAvailable(setup, preset) ? AERON_UI_LIST_ITEM_NONE
-															 : AERON_UI_LIST_ITEM_DISABLED,
-		};
-	}
-	size_t selected = setup->preset <= TIE_SETUP_PRESET_TIE98 ? (size_t)setup->preset : SIZE_MAX;
-	if (AeronUi_ListBox(ui, "First-launch preset", items, 3, &selected, 120.0f) & AERON_UI_LIST_CHANGED) {
-		setup->preset = selected < 3 ? (TieSetupPreset)selected : TIE_SETUP_PRESET_NONE;
-		setup->preset_touched = selected < 3;
-	}
 	TieSetup_DrawSummary(ui, setup);
 	if (setup->message[0])
 		AeronUi_Error(ui, setup->message);

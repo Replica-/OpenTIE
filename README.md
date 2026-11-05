@@ -7,16 +7,14 @@
 
 OpenTIE is an open-source reimplementation of *Star Wars: TIE Fighter* for
 Windows, macOS, and Linux. It runs the original game data natively on current
-systems and supports both the 1995 Collector's CD-ROM and the 1998 Windows
-release.
-
-With both editions installed, OpenTIE can combine the 1995 menus, cutscenes,
-and adaptive iMUSE soundtrack with the 1998 flight simulation and 3D assets.
+systems, combining the 1995 Collector's CD-ROM menus, cutscenes, and adaptive
+iMUSE soundtrack with the 1998 Windows release's flight simulation and 3D
+assets.
 
 > [!IMPORTANT]
 > OpenTIE does not include any content from the original game. A complete
-> installation of at least one supported edition is required. Install both
-> editions to use the recommended combination.
+> installation of both the 1995 Collector's CD-ROM and the 1998 Windows release
+> is required.
 >
 > *Star Wars: TIE Fighter Special Edition* is available from
 > [GOG](https://www.gog.com/en/game/star_wars_tie_fighter_special_edition) and
@@ -25,18 +23,15 @@ and adaptive iMUSE soundtrack with the 1998 flight simulation and 3D assets.
 ## The best of both editions
 
 The 1995 and 1998 releases each have their own presentation, flight simulation,
-and soundtrack. OpenTIE lets the menus and cutscenes, flight simulation, and
-music be selected independently.
-
-The recommended configuration combines:
+and soundtrack. OpenTIE always combines:
 
 - the 1995 menus and cutscenes
 - the 1998 flight simulation and 3D assets
 - the adaptive 1995 iMUSE soundtrack
 
 This retains the 1998 flight presentation without giving up the interactive
-music of the Collector's CD-ROM. Either supported edition can also be played
-on its own.
+music of the Collector's CD-ROM. The menu, cutscene, and flight engine
+selections are fixed and cannot be switched in the settings.
 
 ## Adaptive music
 
@@ -95,9 +90,7 @@ sensitivity and Y-axis inversion.
 1. Download the latest package for your platform from
    [GitHub Releases](https://github.com/elyosh/OpenTIE/releases/latest).
 2. Extract or install the package and launch OpenTIE.
-3. Select the complete TIE95 and/or TIE98 installation folders when prompted.
-4. If both editions are available, select the recommended configuration to
-   combine the 1995 presentation and music with the 1998 flight experience.
+3. Select the complete TIE95 and TIE98 installation folders when prompted.
 
 OpenTIE validates the selected installations, remembers them for future
 launches, and imports compatible existing pilot files during initial setup.
