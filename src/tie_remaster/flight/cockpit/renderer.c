@@ -32,6 +32,7 @@
 #include "tie_remaster/scene2d/text.h"
 #include "tie_runtime/flight_assets/assets.h"
 #include "tie_runtime/flight_assets/source.h"
+#include "tie_runtime/presentation/presentation.h"
 #include "tie_runtime/snapshot/snapshot.h"
 
 #define COCKPIT_MAX_CACHED 8
@@ -576,12 +577,26 @@ static TieCockpitRendererEntry* TieCockpitRenderer_FindOrAllocEntry(TieCockpitRe
 
 /* Fit the cockpit's display aspect inside the HD RT. Classic frames remain
  * full-height and may clip horizontally; authored frames fit completely. */
+/* The cockpit art ends where the bottom message bar starts (456 of 480 rows, 190 of 200 in VGA). With
+ * centered messages the bar is gone, so the art is stretched down over its rows. */
+#define TIE_COCKPIT_ART_HEIGHT_FRACTION 0.95f
+
 typedef struct TieCockpitRendererViewport {
 	float x, y, w, h;
 } TieCockpitRendererViewport;
 
 static void TieCockpitRenderer_CockpitFitViewport(int coord_w, int coord_h, int rt_w, int rt_h,
 												  TieCockpitRendererViewport* out) {
+	if (TiePresentation_Widescreen() && TieCockpitCommon_IsClassic4x3(coord_w, coord_h)) {
+		/* Widescreen: stretch the 4:3 cockpit art across the whole render target; the world is not stretched. */
+		out->x = 0.0f;
+		out->y = 0.0f;
+		out->w = (float)rt_w;
+		out->h = (float)rt_h;
+		if (TiePresentation_CenteredMessages())
+			out->h /= TIE_COCKPIT_ART_HEIGHT_FRACTION;
+		return;
+	}
 	const float cockpit_aspect = TieCockpitCommon_DisplayAspect(coord_w, coord_h);
 	const float rt_aspect = (float)rt_w / (float)rt_h;
 	if (TieCockpitCommon_IsClassic4x3(coord_w, coord_h) || rt_aspect >= cockpit_aspect) {
@@ -2284,16 +2299,19 @@ static void TieCockpitRenderer_DrawMessageBar(TieCockpitRenderer* cg, AeronComma
 	if (!TieFlightHud_MessageBarGeometry(snap, target->target_w, target->target_h, &geometry))
 		return;
 
-	/* Original msg_messagedisplay clears the full framebuffer-width band. */
-	float r, g, b;
-	TieCockpitRenderer_MsgColorToTint(snap, 0x2C, &r, &g, &b);
-	const float body_color[4] = { r, g, b, 1.0f };
-	AeronDrawList_AddFill(cg->record_list, 0.0f, geometry.bar_y, (float)target->target_w, geometry.bar_h,
-						  body_color, AERON_BLIT2D_BLEND_PMA, NULL);
-	TieCockpitRenderer_MsgColorToTint(snap, 0x2D, &r, &g, &b);
-	const float separator_color[4] = { r, g, b, 1.0f };
-	AeronDrawList_AddFill(cg->record_list, 0.0f, geometry.separator_y, (float)target->target_w,
-						  geometry.separator_h, separator_color, AERON_BLIT2D_BLEND_PMA, NULL);
+	const bool centered = TiePresentation_CenteredMessages() != 0;
+	if (!centered) {
+		/* Original msg_messagedisplay clears the full framebuffer-width band. */
+		float r, g, b;
+		TieCockpitRenderer_MsgColorToTint(snap, 0x2C, &r, &g, &b);
+		const float body_color[4] = { r, g, b, 1.0f };
+		AeronDrawList_AddFill(cg->record_list, 0.0f, geometry.bar_y, (float)target->target_w, geometry.bar_h,
+							  body_color, AERON_BLIT2D_BLEND_PMA, NULL);
+		TieCockpitRenderer_MsgColorToTint(snap, 0x2D, &r, &g, &b);
+		const float separator_color[4] = { r, g, b, 1.0f };
+		AeronDrawList_AddFill(cg->record_list, 0.0f, geometry.separator_y, (float)target->target_w,
+							  geometry.separator_h, separator_color, AERON_BLIT2D_BLEND_PMA, NULL);
+	}
 
 	/* Text retains the original body indent and time-warp column. */
 	TieUIText recs[4];
@@ -2312,6 +2330,20 @@ static void TieCockpitRenderer_DrawMessageBar(TieCockpitRenderer* cg, AeronComma
 			.space_between_classic = 0.0f,
 			.fit = TIE_SCENE2D_TEXT_FIT_FILL,
 		};
+		if (centered) {
+			int index = 0;
+			if (snap->hud.msg_bar.present) {
+				/* Message body: horizontally centered, vertically at the middle of the screen. */
+				const float width = TieScene2dTextRenderer_MeasureFestringClassic(
+					cg->text_renderer, recs[0].font_domain, recs[0].font_id, &message_space, recs[0].text);
+				recs[0].x = (int16_t)(((float)geometry.classic_w - width) * 0.5f);
+				recs[0].y = (int16_t)(geometry.classic_h / 2 - 6);
+				++index;
+			}
+			/* Time-warp readout stays on screen, just above where the bar used to be. */
+			if (index < n_recs)
+				recs[index].y = (int16_t)((int)snap->hud.msg_bar.line_top - 14);
+		}
 		TieScene2dTextRenderer_RecordFestringScaled(
 			cg->text_renderer, cg->record_list, geometry.classic_w, geometry.classic_h, &message_space, recs,
 			n_recs, snap->palette, geometry.text_fit_x, 0.0f, geometry.text_scale_x, geometry.scale_y,

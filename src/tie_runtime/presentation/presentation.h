@@ -31,6 +31,12 @@ typedef enum TiePresentationChange {
 
 int TiePresentation_Init(TieAspectRatio modern_aspect);
 int TiePresentation_SetModernAspect(TieAspectRatio modern_aspect);
+/* Renders flight at 16:9 and stretches the 4:3 cockpit art across it. Returns 0 if the update failed. */
+int TiePresentation_SetWidescreen(int enabled);
+int TiePresentation_Widescreen(void);
+/* Flight messages are drawn mid-screen instead of in the bottom message bar. */
+void TiePresentation_SetCenteredMessages(int enabled);
+int TiePresentation_CenteredMessages(void);
 TiePresentationChange TiePresentation_BeginFrame(const AeronInputSnapshot* input, int32_t delta_us);
 const TiePresentationLayout* TiePresentation_Layout(void);
 TieAspectRatio TiePresentation_ModernAspect(void);

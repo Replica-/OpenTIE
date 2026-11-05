@@ -1,6 +1,7 @@
 # Modern renderer for the game application.
 add_library(tie_remaster STATIC
     remaster.c
+    capture.c
     flight/cockpit/renderer.c
     flight/cockpit/layout.c
     flight/cockpit/text.c
@@ -36,6 +37,7 @@ if(TIE_ENABLE_DEBUG_UI)
         debug/cockpit_inspector.cpp)
 endif()
 target_include_directories(tie_remaster PUBLIC ${CMAKE_SOURCE_DIR}/src)
+target_include_directories(tie_remaster PRIVATE ${CMAKE_SOURCE_DIR}/aeron/third_party/stb)
 target_link_libraries(tie_remaster
     PUBLIC aeron aeron_scene aeron_asset tie_formats
     PRIVATE tie_core tie_remaster_scene2d lucas_opt PkgConfig::ZSTD tie_libm)

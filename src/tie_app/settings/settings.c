@@ -1,6 +1,7 @@
 /* Modern settings overlay and typed option-owner integration. */
 
 #include "tie_app/settings/settings.h"
+#include "tie_runtime/presentation/presentation.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -92,6 +93,8 @@ static bool TieSettings_ApplyVideoOptions(const TieAppVideoConfig* previous,
 										  const TieAppVideoConfig* requested, void* user, char* error,
 										  size_t error_capacity) {
 	(void)user;
+	TiePresentation_SetWidescreen(requested->stretch_to_window);
+	TiePresentation_SetCenteredMessages(requested->centered_messages);
 	if (previous->fullscreen != requested->fullscreen && !Aeron_SetFullscreen(requested->fullscreen)) {
 		snprintf(error, error_capacity, "could not change fullscreen mode");
 		return false;
@@ -110,6 +113,8 @@ static bool TieSettings_PersistVideoOptions(const TieAppVideoConfig* options, vo
 	TieAppConfigState* config = (TieAppConfigState*)user;
 	const TieAppVideoConfig* defaults = &config->defaults.video;
 	const bool use_defaults = options->fullscreen == defaults->fullscreen &&
+							  options->stretch_to_window == defaults->stretch_to_window &&
+							  options->centered_messages == defaults->centered_messages &&
 							  options->output.hdr == defaults->output.hdr &&
 							  options->output.sdr_content_gamma == defaults->output.sdr_content_gamma &&
 							  options->output.paper_white_auto == defaults->output.paper_white_auto &&
@@ -361,6 +366,16 @@ static void TieSettings_VideoPage(AeronUiContext* ui) {
 	TieVideoOptions_Get(&options);
 	bool changed = false;
 	AeronUi_Header(ui, "Display");
+	int centered = options.centered_messages;
+	if (AeronUi_Toggle(ui, "Centered Messages", &centered)) {
+		options.centered_messages = centered != 0;
+		changed = true;
+	}
+	int stretch = options.stretch_to_window;
+	if (AeronUi_Toggle(ui, "Widescreen (Stretch Cockpit)", &stretch)) {
+		options.stretch_to_window = stretch != 0;
+		changed = true;
+	}
 	int fullscreen = options.fullscreen;
 	if (AeronUi_Toggle(ui, "Fullscreen", &fullscreen)) {
 		options.fullscreen = fullscreen != 0;

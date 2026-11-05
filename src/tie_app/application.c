@@ -81,6 +81,7 @@ static AeronConfig TieApplication_AeronConfig(const TieLaunchOptions* launch) {
 	config.org_name = "TotallyOpen";
 	config.app_name = "OpenTIE";
 	config.resource_root = launch->resource_root;
+	config.headless = launch->headless;
 	config.resource_path = "resources";
 	config.shader_path = TIE_SHADER_RELATIVE_DIR;
 	config.window_title = "OpenTIE";
@@ -143,7 +144,8 @@ int TieApplication_Run(const TieLaunchOptions* launch) {
 	}
 	/* Activation is asynchronous on macOS. Request it before the remaining
 	 * synchronous startup work, then service the events queued by Aeron_Init. */
-	Aeron_RaiseWindow();
+	if (!launch->headless)
+		Aeron_RaiseWindow();
 	Aeron_PumpEvents();
 	/* Establish cursor visibility after activation events, which may alter the
 	 * platform cursor state. This also makes the cached state authoritative. */
@@ -347,6 +349,8 @@ int TieApplication_Run(const TieLaunchOptions* launch) {
 					app_config.requested.flight_model_opt_projectile_emissive_strength,
 			},
 		},
+		.skip_to_mission = launch && launch->skip_to_mission,
+		.skip_pilot = launch ? launch->skip_pilot : NULL,
 		.frontend_profile = frontend_profile,
 		.flight_profile = launch_config.flight_profile,
 		.audio = {
@@ -369,6 +373,8 @@ int TieApplication_Run(const TieLaunchOptions* launch) {
 	const TieFlightAssetSource* flight_source = NULL;
 	if (!Aeron_FatalErrorRequested()) {
 		flight_source = TieFlightAssets_CurrentSource();
+		TiePresentation_SetWidescreen(app_config.requested.video.stretch_to_window);
+		TiePresentation_SetCenteredMessages(app_config.requested.video.centered_messages);
 		if (!flight_source || !TiePresentation_Init(flight_source->presentation_aspect))
 			Aeron_RequestFatalRendererError("presentation initialization");
 	}
@@ -402,6 +408,8 @@ int TieApplication_Run(const TieLaunchOptions* launch) {
 			.pbr = app_config.requested.pbr,
 			.point_lights = app_config.requested.point_lights,
 	};
+	if (launch->capture_path)
+		TieRemaster_RequestCapture(launch->capture_path, launch->capture_after_seconds);
 	if (!Aeron_FatalErrorRequested() && !TieRemaster_Init(startup_cmd, &remaster_config) &&
 		!Aeron_FatalErrorRequested()) {
 		Aeron_RequestFatalRendererError("remaster initialization");

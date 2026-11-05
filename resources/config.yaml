@@ -252,6 +252,8 @@ input:
 
 video:
   fullscreen: false
+  stretch_to_window: false
+  centered_messages: true
   hdr: true
   sdr_content_gamma: auto
   paper_white_nits: auto

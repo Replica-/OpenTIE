@@ -56,6 +56,8 @@ typedef struct TieRemasterConfig {
 
 bool TieRemaster_Init(AeronCommandBuffer* startup_cmd, const TieRemasterConfig* config);
 void TieRemaster_BeginFrame(const AeronInputSnapshot* input);
+/* Saves the flight view to a PNG once flight has been running for after_seconds, then requests quit. */
+void TieRemaster_RequestCapture(const char* path, float after_seconds);
 bool TieRemaster_Frame(const TieSnapshot* snapshot, int32_t delta_us, bool paused);
 void TieRemaster_ReleaseFlightResources(void);
 void TieRemaster_Shutdown(void);

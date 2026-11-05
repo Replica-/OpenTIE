@@ -9,6 +9,8 @@
 #include "tie/gamesnd.h"
 #include "tie/panel.h"
 #include "tie/shell.h"
+#include "tie/shellext.h"
+#include "tie/shipext.h"
 #include "tie/textext.h"
 #include "tie/tie.h"
 #include "tie/tielogo.h"
@@ -121,6 +123,22 @@ bool TieRuntime_Init(const TieRuntimeConfig* config, char* error, size_t error_c
 	g_playerEngineSoundUpdateEnabled = TieProfile_Flight()->player_engine_sound_enabled ? 1 : 0;
 	strcpy(resourcedir, "RESOURCE/");
 
+	if (config->skip_to_mission) {
+		/* The shell loads the ship tables while opening, so the pilot's mission
+		 * can only be selected once it has been started on the flight scene. */
+		TieShell_Begin(SCENE_FLIGHT_BATTLE, 1);
+		if (config->skip_pilot && shipext_Load_Pilot(config->skip_pilot)) {
+			shipext_Set_Tour_Battle();
+			TieDiagnostics_Log(TIE_LOG_INFO, "[SKIP] pilot %s, mission %s\n", config->skip_pilot,
+							   shipext_Get_Mission_Name());
+		} else {
+			TieDiagnostics_Log(TIE_LOG_ERROR, "[SKIP] could not load pilot %s\n",
+							   config->skip_pilot ? config->skip_pilot : "(none)");
+			TieRuntime_Shutdown();
+			return false;
+		}
+		return true;
+	}
 	TieShell_Begin(6, 1);
 	return true;
 }

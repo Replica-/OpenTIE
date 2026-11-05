@@ -28,6 +28,8 @@ static bool TieVideoOptions_VideoOptionsValid(const TieAppVideoConfig* options) 
 
 static void TieVideoOptions_VideoOptionsNormalize(TieAppVideoConfig* options) {
 	options->fullscreen = options->fullscreen != 0;
+	options->stretch_to_window = options->stretch_to_window != 0;
+	options->centered_messages = options->centered_messages != 0;
 	options->output.hdr = options->output.hdr != 0;
 	options->output.paper_white_auto = options->output.paper_white_auto != 0;
 	options->output.shadows_enabled = options->output.shadows_enabled != 0;
@@ -63,7 +65,9 @@ static void TieVideoOptions_VideoOptionsNormalize(TieAppVideoConfig* options) {
 }
 
 static bool TieVideoOptions_VideoOptionsEqual(const TieAppVideoConfig* left, const TieAppVideoConfig* right) {
-	return left->fullscreen == right->fullscreen && left->output.hdr == right->output.hdr &&
+	return left->fullscreen == right->fullscreen && left->stretch_to_window == right->stretch_to_window &&
+		   left->centered_messages == right->centered_messages &&
+		   left->output.hdr == right->output.hdr &&
 		   left->output.sdr_content_gamma == right->output.sdr_content_gamma &&
 		   left->output.paper_white_auto == right->output.paper_white_auto &&
 		   left->output.paper_white_nits == right->output.paper_white_nits &&

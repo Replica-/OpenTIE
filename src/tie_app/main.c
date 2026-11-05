@@ -3,6 +3,7 @@
 #include "aeron/main.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static int TieMain_Usage(const char* message, const char* argument) {
@@ -10,7 +11,7 @@ static int TieMain_Usage(const char* message, const char* argument) {
 		fprintf(stderr, "[tie-aeron] "), fprintf(stderr, message, argument), fputc('\n', stderr);
 	else if (message)
 		fprintf(stderr, "[tie-aeron] %s\n", message);
-	fprintf(stderr, "Usage: tie [--tie95-data <dir>] [--tie98-data <dir>] [--resource-root <dir>]\n");
+	fprintf(stderr, "Usage: tie [--tie95-data <dir>] [--tie98-data <dir>] [--resource-root <dir>] [--skip-to-mission <pilot>] [--headless] [--capture <file.png> [seconds]]\n");
 	return 2;
 }
 
@@ -20,6 +21,32 @@ static int TieMain_ParseOptions(int argc, char* argv[], TieLaunchOptions* out) {
 	memset(out, 0, sizeof *out);
 	for (int index = 1; index < argc; ++index) {
 		const char* argument = argv[index];
+		if (strcmp(argument, "--headless") == 0) {
+			out->headless = true;
+			continue;
+		}
+		if (strcmp(argument, "--capture") == 0) {
+			/* --capture <file.png> [seconds]: save the flight view after that many seconds, then quit. */
+			if (index + 1 >= argc || argv[index + 1][0] == '-')
+				return TieMain_Usage("option requires a file name: %s", "--capture");
+			out->capture_path = argv[++index];
+			out->capture_after_seconds = 6.0f;
+			if (index + 1 < argc && argv[index + 1][0] >= '0' && argv[index + 1][0] <= '9')
+				out->capture_after_seconds = (float)atof(argv[++index]);
+			continue;
+		}
+		if (strcmp(argument, "--skip-to-mission") == 0 ||
+			strncmp(argument, "--skip-to-mission=", 18) == 0) {
+			const char* pilot =
+				argument[17] == '=' ? argument + 18 : (index + 1 < argc ? argv[++index] : NULL);
+			if (out->skip_to_mission)
+				return TieMain_Usage("duplicate option: %s", "--skip-to-mission");
+			if (!pilot || !pilot[0])
+				return TieMain_Usage("option requires a pilot name: %s", "--skip-to-mission");
+			out->skip_to_mission = true;
+			out->skip_pilot = pilot;
+			continue;
+		}
 		int option = -1;
 		const char* value = NULL;
 		for (int candidate = 0; candidate < 3; ++candidate) {

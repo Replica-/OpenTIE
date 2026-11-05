@@ -12,6 +12,9 @@ typedef struct TieRuntimeConfig {
 	TieFrontendProfileId frontend_profile;
 	TieFlightProfile flight_profile;
 	TieAudioConfig audio;
+	/* Developer shortcut: load this pilot and start its current tour battle mission. */
+	bool skip_to_mission;
+	const char* skip_pilot;
 } TieRuntimeConfig;
 
 bool TieRuntime_Init(const TieRuntimeConfig* config, char* error, size_t error_capacity);

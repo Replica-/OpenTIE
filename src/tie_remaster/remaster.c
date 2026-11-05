@@ -1,3 +1,6 @@
+#include "tie_remaster/capture.h"
+#include "aeron/time.h"
+#include <stdlib.h>
 #include "tie_remaster/remaster.h"
 #include <stdio.h>
 #include <string.h>
@@ -43,13 +46,10 @@ typedef enum TieRemasterViewMode {
 	TIE_REMASTER_VIEW_HD,
 } TieRemasterViewMode;
 
-/* Split view is a debug-only comparison aid; production toggles the two full-screen modes. */
+/* The classic (original renderer) view is disabled: TAB no longer switches away from the HD view. */
 static TieRemasterViewMode TieRemaster_NextViewMode(TieRemasterViewMode selected) {
-#if !defined(NDEBUG)
-	return (TieRemasterViewMode)((selected + 1) % 3);
-#else
-	return selected == TIE_REMASTER_VIEW_CLASSIC ? TIE_REMASTER_VIEW_HD : TIE_REMASTER_VIEW_CLASSIC;
-#endif
+	(void)selected;
+	return TIE_REMASTER_VIEW_HD;
 }
 
 static bool TieRemaster_KeyActiveThisFrame(const AeronInputSnapshot* input, AeronKey key) {
@@ -1098,6 +1098,43 @@ bool TieRemaster_Init(AeronCommandBuffer* startup_cmd, const TieRemasterConfig* 
 	return !Aeron_FatalErrorRequested();
 }
 
+static struct {
+	const char* path;
+	float after_seconds;
+	uint64_t flight_started_us;
+	bool done;
+} g_capture;
+
+void TieRemaster_RequestCapture(const char* path, float after_seconds) {
+	g_capture.path = path;
+	g_capture.after_seconds = after_seconds;
+	g_capture.flight_started_us = 0;
+	g_capture.done = false;
+}
+
+static void TieRemaster_UpdateCapture(const TieSnapshot* snapshot) {
+	if (!g_capture.path || g_capture.done || !TieRemaster_FlightActive(snapshot))
+		return;
+	if (!g_capture.flight_started_us)
+		g_capture.flight_started_us = Aeron_NowUs();
+	if ((float)(Aeron_NowUs() - g_capture.flight_started_us) < g_capture.after_seconds * 1e6f)
+		return;
+	g_capture.done = true;
+	const int width = g_remaster.flight.target_width, height = g_remaster.flight.target_height;
+	const size_t pitch = (size_t)width * 8u;
+	uint16_t* pixels = malloc(pitch * (size_t)height);
+	if (!pixels || !Aeron_ReadRenderTargetRawPixels(g_remaster.flight.present_target, pixels,
+													pitch * (size_t)height, pitch)) {
+		Aeron_LogError("tie.capture", "render-target readback failed");
+	} else if (!TieCapture_SaveRgba16F(g_capture.path, pixels, width, height)) {
+		Aeron_LogError("tie.capture", "could not write %s", g_capture.path);
+	} else {
+		Aeron_LogInfo("tie.capture", "saved %dx%d flight view to %s", width, height, g_capture.path);
+	}
+	free(pixels);
+	Aeron_RequestQuit();
+}
+
 void TieRemaster_BeginFrame(const AeronInputSnapshot* input) {
 	if (!g_remaster.initialized)
 		return;
@@ -1105,6 +1142,7 @@ void TieRemaster_BeginFrame(const AeronInputSnapshot* input) {
 		return;
 
 	const TieSnapshot* snapshot = TieSnapshot_Current();
+	TieRemaster_UpdateCapture(snapshot);
 	bool has_modern_target = TieRemaster_Scene2dActive() || TieRemaster_FlightActive(snapshot);
 	if (input && input->key_pressed[AERON_KEY_TAB] && has_modern_target) {
 		if (input->has_focus && !TieRemaster_ModifierActiveThisFrame(input)) {

@@ -38,6 +38,8 @@ typedef struct TieAppUiConfig {
 
 typedef struct TieAppVideoConfig {
 	bool fullscreen;
+	bool stretch_to_window; /* widescreen render with the 4:3 cockpit art stretched across it */
+	bool centered_messages; /* flight messages in the middle of the screen, not the bottom bar */
 	TieVideoOptions output;
 } TieAppVideoConfig;
 

@@ -16,6 +16,11 @@ typedef struct TiePresentationState {
 } TiePresentationState;
 
 static TiePresentationState g_presentation;
+/* Survive Init/Shutdown: the setting is applied before the layout is first built. */
+static TieAspectRatio TiePresentation_EffectiveAspect(TieAspectRatio source);
+static int g_widescreen;
+static int g_centered_messages = 1;
+static TieAspectRatio g_source_aspect = { 4, 3 };
 
 static int TiePresentation_GreatestCommonDivisor(int a, int b) {
 	while (b != 0) {
@@ -94,6 +99,7 @@ int TiePresentation_Init(TieAspectRatio modern_aspect) {
 	if (g_presentation.initialized || modern_aspect.width <= 0 || modern_aspect.height <= 0) {
 		return 0;
 	}
+	modern_aspect = TiePresentation_EffectiveAspect(modern_aspect);
 	divisor = TiePresentation_GreatestCommonDivisor(modern_aspect.width, modern_aspect.height);
 	modern_aspect.width /= divisor;
 	modern_aspect.height /= divisor;
@@ -135,6 +141,7 @@ int TiePresentation_SetModernAspect(TieAspectRatio modern_aspect) {
 	int render_width;
 	if (!g_presentation.initialized || modern_aspect.width <= 0 || modern_aspect.height <= 0)
 		return 0;
+	modern_aspect = TiePresentation_EffectiveAspect(modern_aspect);
 	const int divisor = TiePresentation_GreatestCommonDivisor(modern_aspect.width, modern_aspect.height);
 	modern_aspect.width /= divisor;
 	modern_aspect.height /= divisor;
@@ -228,3 +235,23 @@ void TiePresentation_FromClassic(float classic_x, float classic_y, int classic_w
 }
 
 void TiePresentation_Shutdown(void) { memset(&g_presentation, 0, sizeof g_presentation); }
+
+/* Widescreen replaces the flight source's aspect with 16:9. */
+static TieAspectRatio TiePresentation_EffectiveAspect(TieAspectRatio source) {
+	g_source_aspect = source;
+	return g_widescreen ? (TieAspectRatio) { 16, 9 } : source;
+}
+
+int TiePresentation_SetWidescreen(int enabled) {
+	enabled = enabled != 0;
+	if (g_widescreen == enabled)
+		return 1;
+	g_widescreen = enabled;
+	return !g_presentation.initialized || TiePresentation_SetModernAspect(g_source_aspect);
+}
+
+int TiePresentation_Widescreen(void) { return g_widescreen; }
+
+void TiePresentation_SetCenteredMessages(int enabled) { g_centered_messages = enabled != 0; }
+
+int TiePresentation_CenteredMessages(void) { return g_centered_messages; }
