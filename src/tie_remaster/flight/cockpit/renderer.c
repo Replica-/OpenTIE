@@ -2333,11 +2333,12 @@ static void TieCockpitRenderer_DrawMessageBar(TieCockpitRenderer* cg, AeronComma
 		if (centered) {
 			int index = 0;
 			if (snap->hud.msg_bar.present) {
-				/* Message body: horizontally centered, vertically at the middle of the screen. */
+				/* Message body: smaller font, horizontally centered, at the top of the screen. */
+				recs[0].font_id = FONT_MICRO64;
 				const float width = TieScene2dTextRenderer_MeasureFestringClassic(
 					cg->text_renderer, recs[0].font_domain, recs[0].font_id, &message_space, recs[0].text);
 				recs[0].x = (int16_t)(((float)geometry.classic_w - width) * 0.5f);
-				recs[0].y = (int16_t)(geometry.classic_h / 2 - 6);
+				recs[0].y = 6;
 				++index;
 			}
 			/* Time-warp readout stays on screen, just above where the bar used to be. */
