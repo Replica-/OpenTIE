@@ -57,10 +57,9 @@ experience is preferred.
 
 ## Graphics
 
-OpenTIE offers classic and modern graphics modes. Classic mode preserves the
-original presentation, while modern mode combines the original models and
-cockpit artwork with high-resolution rendering and substantially more advanced
-lighting.
+OpenTIE renders flight with a modern graphics pipeline that combines the
+original models and cockpit artwork with high-resolution rendering and
+substantially more advanced lighting.
 
 Modern graphics include:
 
@@ -69,8 +68,16 @@ Modern graphics include:
 - MSAA and AMD FidelityFX FSR 3.1.4 anti-aliasing and upscaling
 - HDR output
 
-Press `TAB` while the game is running to switch between classic and modern
-graphics.
+Two flight display options are available under **Settings > Video > Display**:
+
+- **Widescreen (Stretch Cockpit)** renders flight at 16:9 and stretches the
+  original 4:3 cockpit artwork across the whole frame. The 3D world is not
+  stretched. It is off by default.
+- **Centered Messages** shows flight messages in the middle of the screen and
+  removes the bottom message bar. It is on by default. With Widescreen enabled,
+  the cockpit artwork also extends down over the area the bar used to occupy.
+
+The classic (original renderer) view is disabled; `TAB` no longer switches to it.
 
 ## Smoother flight
 
@@ -97,12 +104,6 @@ launches, and imports compatible existing pilot files during initial setup.
 
 To access OpenTIE settings from the concourse, press `ESC` and select
 **OpenTIE Settings**. During flight, press `ESC` to open them directly.
-
-Useful shortcuts:
-
-| Key | Action |
-|---|---|
-| `TAB` | Switch between classic and modern graphics |
 
 ## Supported platforms
 
@@ -148,3 +149,33 @@ Platform-specific instructions are available for
 [Windows](packaging/windows/README.md),
 [macOS](packaging/macos/README.md), and
 [Linux](packaging/linux/README.md).
+
+### Windows native build with MSYS2
+
+The Docker package build is the reference. For day-to-day development on
+Windows, OpenTIE also builds natively with the MSYS2 UCRT64 toolchain:
+
+1. Install MSYS2 and, from a UCRT64 shell, the packages `gcc`, `cmake`,
+   `ninja`, `pkgconf`, `sdl3`, `zstd`, `ffmpeg`, `fluidsynth`, `speexdsp`, and
+   `gdb` (prefixed `mingw-w64-ucrt-x86_64-`).
+2. Build SDL_shadercross with its patch from
+   `packaging/common/shadercross-fsr3.patch` and the Windows DirectX Shader
+   Compiler binaries. MSYS2 does not package it.
+3. Configure with `-DAERON_SHADERCROSS_EXECUTABLE=<path to shadercross.exe>`
+   and build the `tie` target. A recent GCC may also need a force-included
+   header that declares `swprintf_s` and includes `<new>` for the FSR3 sources.
+
+`.vscode/tasks.json` and `.vscode/launch.json` expect the build script and
+dependency prefix at `D:/development/OpenTIE-deps`; adjust the paths for your
+machine.
+
+### Developer options
+
+| Option | Effect |
+|---|---|
+| `--skip-to-mission <pilot>` | Loads the named pilot and starts their current tour battle mission, skipping the menus |
+| `--headless` | Creates a hidden window, treats it as always focused, and discards audio |
+| `--capture <file.png> [seconds]` | Saves the flight view as a PNG once flight has run for the given time (default 6), then quits |
+
+For example, `OpenTIE.exe --headless --skip-to-mission PILOT --capture view.png 3`
+saves a flight frame without opening a window.
