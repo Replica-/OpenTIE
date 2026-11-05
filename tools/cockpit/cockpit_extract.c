@@ -540,54 +540,46 @@ static bool TieCockpitExtract_EmitCockpitView(const TieCockpitExtractOptions* o,
 		fprintf(stderr, "  warn: %s mask covers %d/%d rows (rest opaque)\n", view_name, rows, vh);
 
 	/* --wide: 811-px-wide 16:9 version of the original-size bitmap (one PNG pixel per classic pixel).
-	 * The original art stays pixel-identical in the middle so the HUD lines up; the margins repeat the
-	 * outermost column so they can be repainted by hand. 811 = 480 * 0.95 * 16 / 9: the classic frame
-	 * scaled so the art area fills the screen height. */
+	 * 811 = 480 * 0.95 * 16 / 9: the classic frame scaled so the art area fills the screen height.
+	 * The art is split at the thirds of the original frame (x = 213 and 427) and the extra width is added
+	 * there, which widens the transparent canopy opening and moves the left and right panels outward.
+	 * The middle third, with the centre console, stays pixel-identical. A band of 30 source columns on
+	 * each side of a split is stretched to hide the seam. The runtime moves HUD elements the same way
+	 * (see TieCockpitRenderer_AnchorShift). */
 	if (o->wide && w == 640) {
-		enum { WIDE_W = 811 };
-		const int pad_left = (WIDE_W - w) / 2;
+		enum { WIDE_W = 811, SPLIT_A = 213, SPLIT_B = 427, BAND = 30 };
+		const int pad = WIDE_W - w;
+		const int gap_a = (pad + 1) / 2; /* inserted at SPLIT_A */
+		const int gap_b = pad - gap_a;   /* inserted at SPLIT_B */
 		uint8_t* wide = malloc((size_t)WIDE_W * (size_t)h * 4u);
 		if (wide) {
-			/* Margin fill: the average colour of the six outermost opaque columns on each side, so the
-			 * extension reads as plain dark cockpit panelling instead of streaks. A side with no opaque
-			 * pixels (views with a transparent edge) repeats the edge pixels. */
-			uint8_t side_color[2][4] = { { 0 } };
-			bool side_solid[2] = { false, false };
-			for (int side = 0; side < 2; ++side) {
-				unsigned long sum[3] = { 0, 0, 0 };
-				unsigned long count = 0;
+			for (int x = 0; x < WIDE_W; ++x) {
+				float source_x;
+				if (x < SPLIT_A - BAND)
+					source_x = (float)x;
+				else if (x < SPLIT_A + BAND + gap_a)
+					source_x = (float)(SPLIT_A - BAND) +
+							   (float)(x - (SPLIT_A - BAND)) * (float)(2 * BAND) / (float)(2 * BAND + gap_a);
+				else if (x < SPLIT_B - BAND + gap_a)
+					source_x = (float)(x - gap_a);
+				else if (x < SPLIT_B + BAND + gap_a + gap_b)
+					source_x = (float)(SPLIT_B - BAND) +
+							   (float)(x - (SPLIT_B - BAND + gap_a)) * (float)(2 * BAND) /
+								   (float)(2 * BAND + gap_b);
+				else
+					source_x = (float)(x - gap_a - gap_b);
+				if (source_x < 0.0f)
+					source_x = 0.0f;
+				if (source_x > (float)(w - 1))
+					source_x = (float)(w - 1);
+				const int x0 = (int)source_x;
+				const int x1 = x0 + 1 < w ? x0 + 1 : x0;
+				const float t = source_x - (float)x0;
 				for (int y = 0; y < h; ++y) {
-					for (int i = 0; i < 6; ++i) {
-						const uint8_t* pixel = rgba + ((size_t)y * (size_t)w + (size_t)(side ? w - 1 - i : i)) * 4u;
-						if (pixel[3] < 255)
-							continue;
-						sum[0] += pixel[0];
-						sum[1] += pixel[1];
-						sum[2] += pixel[2];
-						++count;
-					}
-				}
-				if (count > (unsigned long)h * 3) {
-					for (int c = 0; c < 3; ++c)
-						side_color[side][c] = (uint8_t)(sum[c] / count);
-					side_color[side][3] = 255;
-					side_solid[side] = true;
-				}
-			}
-			for (int y = 0; y < h; ++y) {
-				const uint8_t* source = rgba + (size_t)y * (size_t)w * 4u;
-				uint8_t* destination = wide + (size_t)y * WIDE_W * 4u;
-				for (int x = 0; x < WIDE_W; ++x) {
-					const int source_x = x - pad_left;
-					if (source_x >= 0 && source_x < w) {
-						memcpy(destination + (size_t)x * 4u, source + (size_t)source_x * 4u, 4u);
-					} else {
-						const int side = source_x < 0 ? 0 : 1;
-						if (side_solid[side])
-							memcpy(destination + (size_t)x * 4u, side_color[side], 4u);
-						else
-							memcpy(destination + (size_t)x * 4u, source + (size_t)(side ? w - 1 : 0) * 4u, 4u);
-					}
+					const uint8_t* row = rgba + (size_t)y * (size_t)w * 4u;
+					uint8_t* pixel = wide + ((size_t)y * WIDE_W + (size_t)x) * 4u;
+					for (int c = 0; c < 4; ++c)
+						pixel[c] = (uint8_t)((float)row[x0 * 4 + c] * (1.0f - t) + (float)row[x1 * 4 + c] * t + 0.5f);
 				}
 			}
 			char wide_dir[1024], wide_name[16], wide_path[1024];

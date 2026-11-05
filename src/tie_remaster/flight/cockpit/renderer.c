@@ -113,6 +113,10 @@ typedef struct TieCockpitRendererDrawSpace {
 	int coord_w, coord_h;
 	float fit_x, fit_y, fit_w, fit_h;
 	float scale_x, scale_y;
+	/* Authored wide base art: the original frame is split at its thirds, so elements in the left third
+	 * move left by shift_left and elements in the right third move right by shift_right (classic px). */
+	float shift_left, shift_right;
+	float split_left, split_right;
 } TieCockpitRendererDrawSpace;
 
 struct TieCockpitRenderer {
@@ -650,7 +654,7 @@ static TieCockpitRendererDrawSpace TieCockpitRenderer_CockpitDrawSpace(int coord
 																	   const TieCockpitRendererEntry* entry) {
 	TieCockpitRendererViewport fit;
 	TieCockpitRenderer_CockpitFitViewport(coord_w, coord_h, target_w, target_h, entry, &fit);
-	return (TieCockpitRendererDrawSpace) {
+	TieCockpitRendererDrawSpace space = {
 		.target_w = target_w,
 		.target_h = target_h,
 		.coord_w = coord_w,
@@ -662,6 +666,26 @@ static TieCockpitRendererDrawSpace TieCockpitRenderer_CockpitDrawSpace(int coord
 		.scale_x = fit.w / (float)coord_w,
 		.scale_y = fit.h / (float)coord_h,
 	};
+	if (TieCockpitRenderer_UseWideBase(entry)) {
+		const int pad = entry->wide_w - coord_w;
+		const int gap_left = (pad + 1) / 2;
+		space.shift_left = -(float)gap_left;
+		space.shift_right = (float)(pad - gap_left);
+		space.split_left = (float)coord_w / 3.0f;
+		space.split_right = (float)coord_w * 2.0f / 3.0f;
+	}
+	return space;
+}
+
+/* Classic-pixel offset for an element whose horizontal centre is `classic_x` (see shift_left). */
+static float TieCockpitRenderer_AnchorShift(const TieCockpitRendererDrawSpace* space, float classic_x) {
+	if (space->shift_left == 0.0f && space->shift_right == 0.0f)
+		return 0.0f;
+	if (classic_x < space->split_left)
+		return space->shift_left;
+	if (classic_x > space->split_right)
+		return space->shift_right;
+	return 0.0f;
 }
 
 /* Resolve the coord frame the cockpit pass should use for `entry`. When
@@ -1232,6 +1256,7 @@ static void TieCockpitRenderer_BlitCockpitQuadFull(TieCockpitRenderer* cg, Aeron
 	if (!cg || !cg->record_list || dst_w <= 0.0f || dst_h <= 0.0f)
 		return;
 	const TieCockpitRendererDrawSpace* space = &cg->pending_space;
+	dst_x += TieCockpitRenderer_AnchorShift(space, dst_x + dst_w * 0.5f);
 	if (!tex) {
 		const float color[4] = { tint_r + bias_r, tint_g + bias_g, tint_b + bias_b, tint_a + bias_a };
 		AeronDrawList_AddFill(cg->record_list, space->fit_x + dst_x * space->scale_x,
@@ -1322,7 +1347,7 @@ static void TieCockpitRenderer_DrawCockpitBase(TieCockpitRenderer* cg, AeronComm
 		const float u0 = mirrored ? 1.0f : 0.0f;
 		const float u1 = mirrored ? 0.0f : 1.0f;
 		TieCockpitRenderer_BlitCockpitQuad(cg, cmd, pass, entry->wide_tex, coord_w, coord_h,
-										   ((float)coord_w - (float)entry->wide_w) * 0.5f, 0.0f, (float)entry->wide_w,
+										   -(float)((entry->wide_w - coord_w + 1) / 2), 0.0f, (float)entry->wide_w,
 										   (float)entry->wide_h, u0, 0.0f, u1, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f);
 		return;
 	}
@@ -3133,6 +3158,9 @@ static bool TieCockpitRenderer_CockpitRecordLists(TieCockpitRenderer* cg, AeronC
 		TieUIText clock_recs[2];
 		int clock_n = TieCockpitText_BuildclockText(snap, instruments_remapped, clock_recs,
 													(int)(sizeof clock_recs / sizeof clock_recs[0]));
+		for (int i = 0; i < clock_n; ++i)
+			clock_recs[i].x = (int16_t)(clock_recs[i].x +
+										TieCockpitRenderer_AnchorShift(&cg->pending_space, (float)clock_recs[i].x));
 		if (clock_n > 0) {
 			const TieCockpitRendererDrawSpace* space = &cg->pending_space;
 			TieScene2dTextRenderer_RecordFestringScaled(cg->text_renderer, cg->record_list, coord_w, coord_h,
@@ -3147,6 +3175,9 @@ static bool TieCockpitRenderer_CockpitRecordLists(TieCockpitRenderer* cg, AeronC
 		int hud_n = TieCockpitText_BuildHudText(cg->text_renderer, snap, instruments_remapped, &entry->layout,
 												&cockpit_space, hud_recs,
 												(int)(sizeof hud_recs / sizeof hud_recs[0]));
+		for (int i = 0; i < hud_n; ++i)
+			hud_recs[i].x =
+				(int16_t)(hud_recs[i].x + TieCockpitRenderer_AnchorShift(&cg->pending_space, (float)hud_recs[i].x));
 		if (hud_n > 0) {
 			const TieCockpitRendererDrawSpace* space = &cg->pending_space;
 			TieScene2dTextRenderer_RecordFestringScaled(cg->text_renderer, cg->record_list, coord_w, coord_h,
