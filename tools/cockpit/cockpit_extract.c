@@ -10,6 +10,7 @@
 #include "tie_formats/cockpit_masks.h"
 
 #include <ctype.h>
+#include <math.h>
 #include <dirent.h>
 #include <errno.h>
 #include <stdarg.h>
@@ -179,6 +180,7 @@ typedef struct {
 	 * Outputs go to <out>/remaster/flight-16x9/cockpits/ so the 4:3 set isn't
 	 * touched. */
 	bool wide;              /* also emit <view>_wide.png: 16:9 art for the original-assets loader */
+	bool no_octagon;        /* with --wide: skip the painted central octagon pane */
 	bool pillarbox_16x9;
 } TieCockpitExtractOptions;
 
@@ -476,6 +478,8 @@ static void TieCockpitExtract_ParseOpts(int argc, char** argv, TieCockpitExtract
 			o->skip_png = true;
 		else if (!strcmp(argv[i], "--validate-mask"))
 			o->validate_mask = true;
+		else if (!strcmp(argv[i], "--no-octagon"))
+			o->no_octagon = true;
 		else if (!strcmp(argv[i], "--wide"))
 			o->wide = true;
 		else if (!strcmp(argv[i], "--16x9"))
@@ -486,6 +490,89 @@ static void TieCockpitExtract_ParseOpts(int argc, char** argv, TieCockpitExtract
 }
 
 /* ----- per-view extraction --------------------------------------- */
+
+/* --wide: paints a central octagonal pane with struts running out to the frame, in the style of the
+ * TIE Fighter canopy, onto the wide base art. Pixels are written crisp (no antialiasing) like the rest
+ * of the art, then bevelled: opaque pixels next to a transparent one above/left get a highlight and
+ * below/right a shadow. Spokes stop where they meet existing opaque art. */
+static void TieCockpitExtract_PaintOctagon(uint8_t* rgba, int width, int height, float cx, float cy,
+										   float apothem, float thickness) {
+	enum { COVERED = 1 };
+	uint8_t* painted = calloc((size_t)width * (size_t)height, 1);
+	if (!painted)
+		return;
+	const float pi = 3.14159265f;
+	const float circumradius = apothem / cosf(pi / 8.0f);
+	float vx[8], vy[8];
+	for (int i = 0; i < 8; ++i) {
+		const float angle = (22.5f + 45.0f * (float)i) * pi / 180.0f;
+		vx[i] = cx + circumradius * cosf(angle);
+		vy[i] = cy - circumradius * sinf(angle);
+	}
+	const float half = thickness * 0.5f;
+	/* Stamp a filled disc into the coverage mask; skip pixels the original art already owns. */
+#define STAMP(px, py)                                                                                    \
+	do {                                                                                                 \
+		for (int sy = (int)floorf((py) - half); sy <= (int)ceilf((py) + half); ++sy)                     \
+			for (int sx = (int)floorf((px) - half); sx <= (int)ceilf((px) + half); ++sx) {               \
+				if (sx < 0 || sy < 0 || sx >= width || sy >= height)                                     \
+					continue;                                                                            \
+				const float ddx = (float)sx + 0.5f - (px), ddy = (float)sy + 0.5f - (py);                \
+				if (ddx * ddx + ddy * ddy <= half * half && rgba[((size_t)sy * width + sx) * 4 + 3] < 128) \
+					painted[(size_t)sy * width + sx] = COVERED;                                          \
+			}                                                                                            \
+	} while (0)
+	/* Octagon ring. */
+	for (int i = 0; i < 8; ++i) {
+		const int j = (i + 1) % 8;
+		const float length = hypotf(vx[j] - vx[i], vy[j] - vy[i]);
+		for (float s = 0.0f; s <= length; s += 0.5f) {
+			const float t = s / length;
+			const float px = vx[i] + (vx[j] - vx[i]) * t, py = vy[i] + (vy[j] - vy[i]) * t;
+			STAMP(px, py);
+		}
+	}
+	/* Spokes: from each corner straight outward until they reach opaque art. */
+	for (int i = 0; i < 8; ++i) {
+		const float dx = (vx[i] - cx) / circumradius, dy = (vy[i] - cy) / circumradius;
+		for (float s = 0.0f; s < (float)width; s += 0.5f) {
+			const float px = vx[i] + dx * s, py = vy[i] + dy * s;
+			const int ix = (int)px, iy = (int)py;
+			if (ix < 0 || iy < 0 || ix >= width || iy >= height)
+				break;
+			if (rgba[((size_t)iy * width + ix) * 4 + 3] >= 128)
+				break;
+			STAMP(px, py);
+		}
+	}
+#undef STAMP
+	static const uint8_t body[3] = { 20, 23, 46 }, light[3] = { 64, 74, 116 }, shade[3] = { 10, 11, 24 };
+	for (int y = 0; y < height; ++y) {
+		for (int x = 0; x < width; ++x) {
+			if (painted[(size_t)y * width + x] != COVERED)
+				continue;
+			const uint8_t* colour = body;
+			const bool open_up = y == 0 || (!painted[(size_t)(y - 1) * width + x] &&
+											rgba[((size_t)(y - 1) * width + x) * 4 + 3] < 128);
+			const bool open_left = x == 0 || (!painted[(size_t)y * width + x - 1] &&
+											  rgba[((size_t)y * width + x - 1) * 4 + 3] < 128);
+			const bool open_down = y == height - 1 || (!painted[(size_t)(y + 1) * width + x] &&
+													   rgba[((size_t)(y + 1) * width + x) * 4 + 3] < 128);
+			const bool open_right = x == width - 1 || (!painted[(size_t)y * width + x + 1] &&
+													   rgba[((size_t)y * width + x + 1) * 4 + 3] < 128);
+			if (open_up || open_left)
+				colour = light;
+			else if (open_down || open_right)
+				colour = shade;
+			uint8_t* pixel = rgba + ((size_t)y * width + x) * 4;
+			pixel[0] = colour[0];
+			pixel[1] = colour[1];
+			pixel[2] = colour[2];
+			pixel[3] = 255;
+		}
+	}
+	free(painted);
+}
 
 /* Render the cockpit base for one view and emit ktx2 + optional PNG.
  * Returns false (and logs) on any failure for this view; callers
@@ -582,6 +669,11 @@ static bool TieCockpitExtract_EmitCockpitView(const TieCockpitExtractOptions* o,
 						pixel[c] = (uint8_t)((float)row[x0 * 4 + c] * (1.0f - t) + (float)row[x1 * 4 + c] * t + 0.5f);
 				}
 			}
+			/* Front cockpit views (TIEFTR12, TIEADV12, ...) get a central octagonal pane with struts. */
+			const size_t view_name_length = strlen(view_name);
+			if (!o->no_octagon && view_name_length >= 3 && !strcmp(view_name + view_name_length - 2, "12"))
+				TieCockpitExtract_PaintOctagon(wide, WIDE_W, h, (float)(vx + vw / 2 + gap_a),
+											   (float)vy + (float)vh * 0.41f, 80.0f, 11.0f);
 			char wide_dir[1024], wide_name[16], wide_path[1024];
 			snprintf(wide_dir, sizeof wide_dir, "%s/wide", o->out_dir);
 			TieCockpitExtract_MakePath(wide_dir);

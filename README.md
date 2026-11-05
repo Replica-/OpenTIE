@@ -88,7 +88,8 @@ canopy opening and moves the left and right panels outward. The game moves the g
 overlays in the left and right thirds by the same amounts, so they stay on their panels.
 
 `cockpit_extract <CP640 dir> <VGA.PAC> <output dir> --no-upscale --no-png --rgba --wide` writes a starting
-point for every view to `<output dir>/wide/`, with the art stretched around the two splits. Touch up the
+point for every view to `<output dir>/wide/`, with the art stretched around the two splits. Front cockpit views
+also get a painted central octagonal pane with struts to the frame (`--no-octagon` skips it). Touch up the
 seams by hand. These files are derived from the original game art, so do not redistribute them.
 
 ## Smoother flight
