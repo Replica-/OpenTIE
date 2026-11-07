@@ -119,6 +119,8 @@ typedef struct TieHudInstrument {
 } TieHudInstrument;
 
 #define TIE_MAX_WEAPON_GROUPS 12
+#define TIE_HUD_REPAIR_SYSTEMS 10
+#define TIE_HUD_OBJECTIVE_LINES 24
 
 typedef struct TieHudState {
 	/* Player-craft summary. */
@@ -131,6 +133,24 @@ typedef struct TieHudState {
 	uint16_t installed_subsystems;
 	uint16_t working_subsystems;
 	uint16_t subsystem_active; /* on/off */
+	/* Damage-control readout (damage_outputsystem), one row per
+	 * SystemStringId: whether the craft has the system, its health and,
+	 * at 0%, the repair countdown. */
+	struct {
+		char name[24];
+		uint8_t installed;
+		uint8_t health_percent;
+		uint16_t repair_seconds;
+	} repairs[TIE_HUD_REPAIR_SYSTEMS];
+	/* Mission goals screen text (goals_capturegoals): each run's origin in
+	 * the room's frame, its starting palette colour and its characters with
+	 * 0xFE colour escapes. Refreshed a few times a second. */
+	uint8_t objective_count;
+	struct {
+		int16_t x, y;
+		uint8_t color;
+		char text[64];
+	} objectives[TIE_HUD_OBJECTIVE_LINES];
 	/* Engine `CraftData.status_flags` (+0x0AE). Distinct from
 	 * subsystem_active. Bit 4 (0x10) = lasers powered, bit 2 (0x04) =
 	 * target lock-on enabled, bit 3 (0x08) = missiles enabled, bit 0

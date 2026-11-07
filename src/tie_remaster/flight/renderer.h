@@ -79,6 +79,18 @@ AeronTexture* TieFlightRenderer_PipTexture(const TieFlightRenderer* g);
 /* Binds the cockpit and flight-HUD compositor to the scene pass. */
 struct TieCockpitRenderer;
 void TieFlightRenderer_SetCockpit(TieFlightRenderer* g, struct TieCockpitRenderer* cockpit);
+/* True when this frame draws the 3D cockpit model in place of the cockpit art. */
+bool TieFlightRenderer_Cockpit3dActive(const TieFlightRenderer* g);
+/* Basename of the 3D cockpit model drawn this frame, or NULL. */
+const char* TieFlightRenderer_Cockpit3dModel(const TieFlightRenderer* g);
+/* The 3D cockpit's surface under render-target pixel (x, y): the nearest hit
+ * point and its normal (facing the eye) in camera-local world units. */
+bool TieFlightRenderer_Cockpit3dSurfaceAt(const TieFlightRenderer* g, float x, float y, float point[3],
+										  float normal[3]);
+/* The eye ray through render-target pixel (x, y) and the projection of a
+ * camera-local world point to clip space, for this frame's flight camera. */
+bool TieFlightRenderer_ScreenRay(const TieFlightRenderer* g, float x, float y, float origin[3], float dir[3]);
+void TieFlightRenderer_ProjectLocal(const TieFlightRenderer* g, const float point[3], float clip[4]);
 
 /* Returns the process-wide live renderer, or NULL. */
 TieFlightRenderer* TieFlightRenderer_Current(void);

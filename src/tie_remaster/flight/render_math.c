@@ -8,7 +8,10 @@
 #include "aeron/scene/scene3d.h"
 #include "aeron/scene/world.h"
 
+#include "tie_remaster/flight/cockpit/editor.h"
+#include "tie_runtime/presentation/presentation.h"
 #include "tie_runtime/snapshot/snapshot.h"
+
 
 void TieRenderMath_Mat4Identity(float m[16]) {
 	memset(m, 0, sizeof(float) * 16);
@@ -244,8 +247,19 @@ void TieRenderMath_BuildCameraAtOrigin(TieFlightCamera* out, const struct TieCam
 	 * the whole framebuffer. Recover that aperture's focal lengths after
 	 * mapping it into the 4:3 reference, then extend the same projection
 	 * across the full output. Independent axes preserve DOS yAspect. */
-	const float tan_h = tanf(classic_h_half) * (float)rt_w / aperture_w;
-	const float tan_v = tanf(classic_v_half) * (float)rt_h / aperture_h;
+	float tan_h = tanf(classic_h_half) * (float)rt_w / aperture_w;
+	float tan_v = tanf(classic_v_half) * (float)rt_h / aperture_h;
+	/* The 3D cockpit sets its own field of view from the craft; both axes
+	 * scale together so the aspect and reticle placement are kept. */
+	if (TiePresentation_Cockpit3d() && cam->target_obj_slot != 0xFFFF && !cam->zoom_active) {
+		float pan_x, pan_y, fov_deg;
+		TieCockpitEditor_View(&pan_x, &pan_y, &fov_deg);
+		const float widen = tanf(fov_deg * 0.5f * 3.14159265f / 180.0f) / tan_h;
+		if (widen > 0.0f) {
+			tan_h *= widen;
+			tan_v *= widen;
+		}
+	}
 	out->h_half_rad = atanf(tan_h);
 	out->v_half_rad = atanf(tan_v);
 

@@ -42,6 +42,8 @@
 
 /* AERON_MAX_MESH_SLOTS is the shared retained-scene table capacity. */
 
+#define TIE_FLIGHT_COCKPIT3D_MAX_CHUNKS 32
+
 /* ----- Per-species retained-scene cache ----- */
 
 typedef struct TieFlightSpeciesSceneShip {
@@ -314,6 +316,13 @@ struct TieFlightRenderer {
 	TieFlightShadowSettings shadows;
 
 	bool scene_model_backend;
+	/* 3D cockpit model (cockpit3d.c); `cockpit3d_model` is the basename
+	 * last tried, whether or not it loaded. */
+	AeronSceneMesh* cockpit3d_meshes[TIE_FLIGHT_COCKPIT3D_MAX_CHUNKS];
+	uint32_t cockpit3d_mesh_count;
+	const char* cockpit3d_model;
+	bool cockpit3d_active; /* submitted this frame */
+	float cockpit3d_transform[16]; /* model (metres) to camera-local world, this frame */
 	/* Inspector requests are acknowledged during flight and take effect at the
 	 * next mission generation, when simulation and rendering rebuild together.
 	 * `scene_reload_one_idx` uses 0xFFFF as its sentinel. */
@@ -443,6 +452,11 @@ void TieFlightRenderer_ReleaseSpeciesMesh(TieFlightSpeciesMesh* m);
 bool TieFlightRenderer_EnsureSceneSpeciesShip(struct TieFlightRenderer* g, AeronCommandBuffer* cmd,
 											  uint16_t species_idx);
 void TieFlightRenderer_ReleaseSceneSpeciesShip(struct TieFlightRenderer* g, TieFlightSpeciesSceneShip* s);
+
+/* cockpit3d.c: Prepare loads the model before the scene begins; Submit adds it to the scene. */
+void TieFlightCockpit3d_Prepare(struct TieFlightRenderer* g, AeronCommandBuffer* cmd, const TieSnapshot* curr);
+void TieFlightCockpit3d_Submit(struct TieFlightRenderer* g, const TieSnapshot* curr, const float cam_pos[3]);
+void TieFlightCockpit3d_Release(struct TieFlightRenderer* g);
 
 /* Acknowledge inspector reload requests without evicting the immutable
  * current-mission model generation. */

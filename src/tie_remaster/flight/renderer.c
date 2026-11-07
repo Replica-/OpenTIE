@@ -407,6 +407,7 @@ void TieFlightRenderer_Shutdown(TieFlightRenderer* g) {
 	if (!g)
 		return;
 	TieFlightRenderer_ReleaseMissionAssets(g);
+	TieFlightCockpit3d_Release(g);
 	if (g->opt_sampler)
 		Aeron_DestroySampler(g->opt_sampler);
 	if (g->billboards)

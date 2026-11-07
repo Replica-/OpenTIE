@@ -11,7 +11,7 @@ static int TieMain_Usage(const char* message, const char* argument) {
 		fprintf(stderr, "[tie-aeron] "), fprintf(stderr, message, argument), fputc('\n', stderr);
 	else if (message)
 		fprintf(stderr, "[tie-aeron] %s\n", message);
-	fprintf(stderr, "Usage: tie [--tie95-data <dir>] [--tie98-data <dir>] [--resource-root <dir>] [--skip-to-mission <pilot>] [--headless] [--capture <file.png> [seconds]]\n");
+	fprintf(stderr, "Usage: tie [--tie95-data <dir>] [--tie98-data <dir>] [--resource-root <dir>] [--skip-to-mission <pilot>] [--headless] [--capture <file.png> [seconds]] [--cockpit-editor]\n");
 	return 2;
 }
 
@@ -23,6 +23,10 @@ static int TieMain_ParseOptions(int argc, char* argv[], TieLaunchOptions* out) {
 		const char* argument = argv[index];
 		if (strcmp(argument, "--headless") == 0) {
 			out->headless = true;
+			continue;
+		}
+		if (strcmp(argument, "--cockpit-editor") == 0) {
+			out->cockpit_editor = true;
 			continue;
 		}
 		if (strcmp(argument, "--capture") == 0) {

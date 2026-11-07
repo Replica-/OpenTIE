@@ -20,6 +20,8 @@
 
 #include <stdint.h>
 
+#include "tie/festring.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -80,6 +82,13 @@ extern void* goalgenusstrings;    /* const char *[16] genus-category      */
 extern void* goalallfgstring;     /* const char *     "all FG"            */
 
 int32_t goals_missiongoalsroom(void);
+
+#ifdef TIE_MODERN
+/* Runs the goal list drawing of goals_missiongoalsroom as captured text
+ * (festring_capturebegin) for the TFTC objectives HUD. Leaves the room's
+ * state untouched; returns the number of lines. */
+int goals_capturegoals(FestringCaptureLine* lines, int capacity);
+#endif
 
 #ifdef __cplusplus
 }

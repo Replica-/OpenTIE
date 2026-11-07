@@ -32,6 +32,23 @@ void festring_clearscreen(void);
 void festring_hidescreen(void);
 void festring_showscreen(void);
 
+#ifdef TIE_MODERN
+/* One captured run of text: where it started and its characters, with
+ * 0xFE+colour escapes where the (remapped) text colour changes. */
+typedef struct FestringCaptureLine {
+	int16_t x, y;
+	uint8_t color;
+	char text[64];
+} FestringCaptureLine;
+
+/* Text capture: until festring_captureend, characters sent through outchar
+ * are recorded into `lines` instead of drawn. festring state (cursor,
+ * colours, margins, wrap, font) is restored by festring_captureend, which
+ * returns the number of lines recorded. */
+void festring_capturebegin(FestringCaptureLine* lines, int capacity);
+int festring_captureend(void);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

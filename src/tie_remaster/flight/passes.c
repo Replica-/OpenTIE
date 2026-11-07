@@ -458,6 +458,10 @@ static bool TieFlightRenderer_PreparePip(TieFlightRenderer* g, AeronCommandBuffe
 
 	const bool hd_ready = g->scene_model_backend && fl && fl->ship_idx < TIE_FLIGHT_MAX_SPECIES &&
 						  g->scene_ships[fl->ship_idx].ready;
+	/* Over a TFTC cockpit the target floats on the cockpit's own screen:
+	 * clear to transparent; the compositor keeps the scene's coverage. */
+	if (g->scene_model_backend && g->cockpit3d_active)
+		clear[0] = clear[1] = clear[2] = clear[3] = 0.0f;
 	const bool clear_hd = g->scene_model_backend && !snap->cockpit.pip_target_present;
 	if (hd_ready || clear_hd) {
 		AeronSceneCamera camera = {
@@ -688,6 +692,7 @@ bool TieFlightRenderer_PrepareFrame(TieFlightRenderer* g, AeronCommandBuffer* cm
 
 	if (!TieFlightRenderer_PrepareMissionAssets(g, cmd, curr))
 		return false;
+	TieFlightCockpit3d_Prepare(g, cmd, curr);
 
 	/* Build view-projection + viewport rects. The helper preserves the
 	 * captured classic aperture's focal scale while extending the
@@ -901,6 +906,7 @@ bool TieFlightRenderer_PrepareFrame(TieFlightRenderer* g, AeronCommandBuffer* cm
 	/* Snapshot → mesh instances (HD only; classic geometry draws via
 	 * the BEFORE_OPAQUE hook instead). */
 	TieFlightRenderer_SceneSubmit(g, curr, view_proj, fcam.camera.pos, &mb);
+	TieFlightCockpit3d_Submit(g, curr, fcam.camera.pos);
 	TieFlightPointLights_Submit(g->scene, &point_frame, true);
 	if (!TieFlightPointLights_ConfigureScene(g->scene))
 		return false;

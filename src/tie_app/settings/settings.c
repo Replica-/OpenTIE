@@ -93,8 +93,8 @@ static bool TieSettings_ApplyVideoOptions(const TieAppVideoConfig* previous,
 										  const TieAppVideoConfig* requested, void* user, char* error,
 										  size_t error_capacity) {
 	(void)user;
-	TiePresentation_SetWidescreen(requested->stretch_to_window);
 	TiePresentation_SetCenteredMessages(requested->centered_messages);
+	TiePresentation_SetCockpit3d(requested->tftc_cockpits);
 	if (previous->fullscreen != requested->fullscreen && !Aeron_SetFullscreen(requested->fullscreen)) {
 		snprintf(error, error_capacity, "could not change fullscreen mode");
 		return false;
@@ -113,8 +113,8 @@ static bool TieSettings_PersistVideoOptions(const TieAppVideoConfig* options, vo
 	TieAppConfigState* config = (TieAppConfigState*)user;
 	const TieAppVideoConfig* defaults = &config->defaults.video;
 	const bool use_defaults = options->fullscreen == defaults->fullscreen &&
-							  options->stretch_to_window == defaults->stretch_to_window &&
 							  options->centered_messages == defaults->centered_messages &&
+							  options->tftc_cockpits == defaults->tftc_cockpits &&
 							  options->output.hdr == defaults->output.hdr &&
 							  options->output.sdr_content_gamma == defaults->output.sdr_content_gamma &&
 							  options->output.paper_white_auto == defaults->output.paper_white_auto &&
@@ -371,9 +371,9 @@ static void TieSettings_VideoPage(AeronUiContext* ui) {
 		options.centered_messages = centered != 0;
 		changed = true;
 	}
-	int stretch = options.stretch_to_window;
-	if (AeronUi_Toggle(ui, "Widescreen (Stretch Cockpit)", &stretch)) {
-		options.stretch_to_window = stretch != 0;
+	int tftc_cockpits = options.tftc_cockpits;
+	if (AeronUi_Toggle(ui, "TFTC Cockpits", &tftc_cockpits)) {
+		options.tftc_cockpits = tftc_cockpits != 0;
 		changed = true;
 	}
 	int fullscreen = options.fullscreen;
