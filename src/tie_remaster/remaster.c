@@ -8,6 +8,7 @@
 #include "aeron/compat/host.h"
 #include "aeron/scene/blend_ramp.h"
 #include "aeron/scene/present.h"
+#include "tie_remaster/flight/cockpit/editor.h"
 #include "tie_remaster/flight/cockpit/renderer.h"
 #include "tie_remaster/flight/renderer.h"
 #include "tie_remaster/integration/snapshot_adapter.h"
@@ -806,7 +807,8 @@ static bool TieRemaster_FlightRenderDue(const TieSnapshot* snapshot) {
 		 flight->last_training_timer_sec != snapshot->hud.training.timer_sec ||
 		 flight->last_training_score != snapshot->hud.training.score ||
 		 flight->last_training_bonus != snapshot->hud.training.bonus);
-	return !flight->rendered || flight->force_render || !presentation ||
+	/* The cockpit editor redraws a paused, unchanging snapshot as it is used. */
+	return !flight->rendered || flight->force_render || !presentation || TieCockpitEditor_Open() ||
 		   flight->render_generation != presentation->render_generation ||
 		   flight->last_flight_frame != snapshot->flight_frame ||
 		   flight->last_mission_generation != snapshot->mission_load_generation ||

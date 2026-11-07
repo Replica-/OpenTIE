@@ -1,6 +1,9 @@
 #include "tie_runtime/snapshot/snapshot_hud.h"
 
+#include "tie/collide.h"
+#include "tie/damage.h"
 #include "tie/fediskio.h"
+#include "tie/goals.h"
 #include "tie/festring.h"
 #include "tie/gate.h"
 #include "tie/logbuf2.h"
@@ -152,6 +155,27 @@ static int32_t TieHudSnapshot_TargetBoxGeometry(FlightObject* object, int mesh_i
 	return modelmesh_getcomponentmaxextent(object->ship_idx, mesh_index);
 }
 
+/* The goals screen text for the objectives HUD, refreshed every
+ * TIE_HUD_OBJECTIVE_REFRESH snapshots: the goal checks are not free. */
+#define TIE_HUD_OBJECTIVE_REFRESH 30
+static FestringCaptureLine s_objective_lines[TIE_HUD_OBJECTIVE_LINES];
+static int s_objective_count;
+static unsigned s_objective_age = TIE_HUD_OBJECTIVE_REFRESH;
+
+static void TieHudSnapshot_CaptureObjectives(TieHudState* hud) {
+	if (goaltitlestrings && ++s_objective_age >= TIE_HUD_OBJECTIVE_REFRESH) {
+		s_objective_age = 0;
+		s_objective_count = goals_capturegoals(s_objective_lines, TIE_HUD_OBJECTIVE_LINES);
+	}
+	hud->objective_count = (uint8_t)s_objective_count;
+	for (int i = 0; i < s_objective_count; ++i) {
+		hud->objectives[i].x = s_objective_lines[i].x;
+		hud->objectives[i].y = s_objective_lines[i].y;
+		hud->objectives[i].color = s_objective_lines[i].color;
+		memcpy(hud->objectives[i].text, s_objective_lines[i].text, sizeof hud->objectives[i].text);
+	}
+}
+
 static void TieHudSnapshot_CaptureHud(void) {
 	TieHudState* hud = TieSnapshotBuilder_HudMut();
 
@@ -165,6 +189,14 @@ static void TieHudSnapshot_CaptureHud(void) {
 		hud->installed_subsystems = pc->installed_subsystems;
 		hud->working_subsystems = pc->working_subsystems;
 		hud->subsystem_active = pc->subsystem_active;
+		for (int i = 0; i < TIE_HUD_REPAIR_SYSTEMS; ++i) {
+			const char* name = systemstrings ? systemstrings[i] : NULL;
+			snprintf(hud->repairs[i].name, sizeof hud->repairs[i].name, "%s", name ? name : "");
+			hud->repairs[i].installed = (pc->subsystem_active & (uint16_t)systemmask[i]) != 0;
+			hud->repairs[i].health_percent = (uint8_t)pstate.subsystem_health_percent[i];
+			hud->repairs[i].repair_seconds = pstate.subsystem_repair_seconds[i];
+		}
+		TieHudSnapshot_CaptureObjectives(hud);
 		hud->status_flags = pc->status_flags;
 		hud->weapon_group_cnt = pc->weapon_group_cnt;
 		if (spec_data[pstate.player_spec_num].missile_count[0] +

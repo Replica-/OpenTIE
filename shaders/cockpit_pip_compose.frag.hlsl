@@ -40,9 +40,9 @@ float4 main(VSOut input) : SV_Target
     float  m = g_mask.Sample(s_mask, input.uv).a;
     /* PMA-encode: rgb premultiplied by alpha=m so the standard PMA
      * blend (src + (1-src.a)*dst) leaves dst untouched outside the
-     * mask. Color RT's own alpha is dropped — the silhouette pre-pass
-     * clears to opaque-black and writes alpha=1 everywhere, so it
-     * carries no useful coverage information; mask is the only
-     * coverage source. */
-    return float4(c.rgb * m, m);
+     * mask. The silhouette pre-pass normally clears to opaque, so its
+     * alpha is 1 and the mask is the only coverage source; over a TFTC
+     * cockpit it clears to transparent, and its alpha drops the
+     * background too. */
+    return float4(c.rgb * m * c.a, m * c.a);
 }

@@ -18,8 +18,8 @@ typedef struct TiePresentationState {
 static TiePresentationState g_presentation;
 /* Survive Init/Shutdown: the setting is applied before the layout is first built. */
 static TieAspectRatio TiePresentation_EffectiveAspect(TieAspectRatio source);
-static int g_widescreen;
 static int g_centered_messages = 1;
+static int g_cockpit_3d;
 static TieAspectRatio g_source_aspect = { 4, 3 };
 
 static int TiePresentation_GreatestCommonDivisor(int a, int b) {
@@ -236,22 +236,22 @@ void TiePresentation_FromClassic(float classic_x, float classic_y, int classic_w
 
 void TiePresentation_Shutdown(void) { memset(&g_presentation, 0, sizeof g_presentation); }
 
-/* Widescreen replaces the flight source's aspect with 16:9. */
+/* The 3D cockpits replace the flight source's aspect with 16:9. */
 static TieAspectRatio TiePresentation_EffectiveAspect(TieAspectRatio source) {
 	g_source_aspect = source;
-	return g_widescreen ? (TieAspectRatio) { 16, 9 } : source;
+	return g_cockpit_3d ? (TieAspectRatio) { 16, 9 } : source;
 }
-
-int TiePresentation_SetWidescreen(int enabled) {
-	enabled = enabled != 0;
-	if (g_widescreen == enabled)
-		return 1;
-	g_widescreen = enabled;
-	return !g_presentation.initialized || TiePresentation_SetModernAspect(g_source_aspect);
-}
-
-int TiePresentation_Widescreen(void) { return g_widescreen; }
 
 void TiePresentation_SetCenteredMessages(int enabled) { g_centered_messages = enabled != 0; }
 
 int TiePresentation_CenteredMessages(void) { return g_centered_messages; }
+
+int TiePresentation_SetCockpit3d(int enabled) {
+	enabled = enabled != 0;
+	if (g_cockpit_3d == enabled)
+		return 1;
+	g_cockpit_3d = enabled;
+	return !g_presentation.initialized || TiePresentation_SetModernAspect(g_source_aspect);
+}
+
+int TiePresentation_Cockpit3d(void) { return g_cockpit_3d; }

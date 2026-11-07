@@ -26,6 +26,7 @@
 #include "tie_app/setup/installation.h"
 #include "tie_app/setup/setup.h"
 #include "tie_app/ui.h"
+#include "tie_remaster/flight/cockpit/editor.h"
 #include "tie_remaster/remaster.h"
 #include "tie_runtime/flight_assets/service.h"
 #include "tie_runtime/hooks/axis_input.h"
@@ -373,8 +374,8 @@ int TieApplication_Run(const TieLaunchOptions* launch) {
 	const TieFlightAssetSource* flight_source = NULL;
 	if (!Aeron_FatalErrorRequested()) {
 		flight_source = TieFlightAssets_CurrentSource();
-		TiePresentation_SetWidescreen(app_config.requested.video.stretch_to_window);
 		TiePresentation_SetCenteredMessages(app_config.requested.video.centered_messages);
+		TiePresentation_SetCockpit3d(app_config.requested.video.tftc_cockpits);
 		if (!flight_source || !TiePresentation_Init(flight_source->presentation_aspect))
 			Aeron_RequestFatalRendererError("presentation initialization");
 	}
@@ -410,6 +411,8 @@ int TieApplication_Run(const TieLaunchOptions* launch) {
 	};
 	if (launch->capture_path)
 		TieRemaster_RequestCapture(launch->capture_path, launch->capture_after_seconds);
+	if (launch->cockpit_editor)
+		TieCockpitEditor_RequestOpen();
 	if (!Aeron_FatalErrorRequested() && !TieRemaster_Init(startup_cmd, &remaster_config) &&
 		!Aeron_FatalErrorRequested()) {
 		Aeron_RequestFatalRendererError("remaster initialization");

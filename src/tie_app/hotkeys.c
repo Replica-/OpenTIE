@@ -3,6 +3,7 @@
 #include "aeron/aeron.h"
 #include "tie_app/settings/settings.h"
 #include "tie_app/settings/video_options.h"
+#include "tie_remaster/flight/cockpit/editor.h"
 #include "tie_runtime/input/input.h"
 #include "tie_runtime/input/keyboard_mapping.h"
 #include "tie_runtime/snapshot/snapshot.h"
@@ -95,6 +96,14 @@ static void TieHotkeys_ProcessPause(TieHotkeys* hotkeys, const AeronInputSnapsho
 	TieInput_SuppressKey(trigger);
 }
 
+/* F12 toggles the cockpit editor while a TFTC cockpit is on screen. */
+static void TieHotkeys_ProcessCockpitEditor(const AeronInputSnapshot* input) {
+	if (!input || !input->has_focus || !input->key_pressed[AERON_KEY_F12] || !TieCockpitEditor_Available())
+		return;
+	TieCockpitEditor_SetOpen(!TieCockpitEditor_Open());
+	TieInput_SuppressKey(AERON_KEY_F12);
+}
+
 void TieHotkeys_Init(TieHotkeys* hotkeys) {
 	if (!hotkeys)
 		return;
@@ -117,6 +126,8 @@ TieHotkeysFrame TieHotkeys_Process(TieHotkeys* hotkeys, const AeronInputSnapshot
 	frame.settings_opened = !was_open && TieSettings_Open();
 	if (!TieSettings_CapturesKeyboard())
 		TieHotkeys_ProcessPause(hotkeys, input);
+	if (!TieSettings_Open())
+		TieHotkeys_ProcessCockpitEditor(input);
 	frame.paused = hotkeys->paused;
 	return frame;
 }

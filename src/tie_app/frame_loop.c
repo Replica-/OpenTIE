@@ -11,6 +11,7 @@
 #include "tie_app/hotkeys.h"
 #include "tie_app/settings/flight_options.h"
 #include "tie_app/settings/settings.h"
+#include "tie_remaster/flight/cockpit/editor.h"
 #include "tie_remaster/remaster.h"
 #include "tie_runtime/display/classic_display.h"
 #include "tie_runtime/display/classic_framebuffer.h"
@@ -148,9 +149,11 @@ void TieFrameLoop_Run(void) {
 		const bool focus_paused = TieFrameLoop_UpdateFocus(input, &ever_had_focus);
 		TieFrameLoop_UpdatePresentation(input, delta_us);
 		const TieHotkeysFrame hotkey_frame = TieHotkeys_Process(&hotkeys, input);
-		bool menu_open = hotkey_frame.menu_open;
+		TieCockpitEditor_SetInput(input);
+		/* The cockpit editor holds flight paused, like the settings menu. */
+		bool menu_open = hotkey_frame.menu_open || TieCockpitEditor_Open();
 		bool settings_opened_this_frame = hotkey_frame.settings_opened;
-		TieInput_UpdateCapture(TieSnapshot_Current(), TieSettings_Open());
+		TieInput_UpdateCapture(TieSnapshot_Current(), TieSettings_Open() || TieCockpitEditor_Open());
 		TieClassicLayer_SyncInputExtent();
 
 		TieAppLiveFlightOptions flight_options;
@@ -187,7 +190,7 @@ void TieFrameLoop_Run(void) {
 		/* Do not let the input edge that opened the menu close it again. */
 		if (!settings_opened_this_frame)
 			TieSettings_Frame(input, (float)delta_us * 1e-6f);
-		TieInput_SyncSystemCursor(TieSettings_Open());
+		TieInput_SyncSystemCursor(TieSettings_Open() || TieCockpitEditor_Open());
 
 		if (Aeron_FatalErrorRequested())
 			break;

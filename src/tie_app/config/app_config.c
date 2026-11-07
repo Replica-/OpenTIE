@@ -186,7 +186,7 @@ static bool TieAppConfig_ValidateSchemaKeys(const AeronConfigFile* document, boo
 				  "opt_projectile_emissive_strength");
 	VALIDATE_KEYS(document, "input", warn, "controllers", "gamepad_defaults", "keyboard", "mouse_flight",
 				  "mouse_mode", "mouse_sensitivity", "mouse_invert_y");
-	VALIDATE_KEYS(document, "video", warn, "fullscreen", "stretch_to_window", "centered_messages", "hdr", "sdr_content_gamma", "paper_white_nits");
+	VALIDATE_KEYS(document, "video", warn, "fullscreen", "centered_messages", "tftc_cockpits", "hdr", "sdr_content_gamma", "paper_white_nits");
 	VALIDATE_KEYS(document, "render", warn, "anisotropy", "ssao", "temporal_upscaling", "shadows", "tonemap",
 				  "motion_blur", "msaa_samples", "starfield_style");
 	VALIDATE_KEYS(document, "render.motion_blur", warn, "quality", "shutter");
@@ -237,8 +237,8 @@ static bool TieAppConfig_ParseVideo(const AeronConfigFile* document, TieAppVideo
 	const AeronConfigNode* gamma;
 	const AeronConfigNode* white;
 	if (!TieAppConfig_ReadBool(document, "video.fullscreen", &out->fullscreen, error, capacity) ||
-		!TieAppConfig_ReadBool(document, "video.stretch_to_window", &out->stretch_to_window, error, capacity) ||
 		!TieAppConfig_ReadBool(document, "video.centered_messages", &out->centered_messages, error, capacity) ||
+		!TieAppConfig_ReadBool(document, "video.tftc_cockpits", &out->tftc_cockpits, error, capacity) ||
 		!TieAppConfig_ReadBool(document, "video.hdr", &out->output.hdr, error, capacity))
 		return false;
 	gamma = AeronConfigFile_GetNode(document, "video.sdr_content_gamma");
@@ -992,8 +992,8 @@ static bool TieAppConfig_SetVideoOverrides(AeronConfigFile* document, const TieA
 		return false;
 	if (!TieAppConfig_SetBoolOverride(document, "video.centered_messages", video->centered_messages,
 									  defaults->centered_messages, error) ||
-		!TieAppConfig_SetBoolOverride(document, "video.stretch_to_window", video->stretch_to_window,
-									  defaults->stretch_to_window, error) ||
+		!TieAppConfig_SetBoolOverride(document, "video.tftc_cockpits", video->tftc_cockpits, defaults->tftc_cockpits,
+									  error) ||
 		!TieAppConfig_SetBoolOverride(document, "video.fullscreen", video->fullscreen, defaults->fullscreen,
 									  error) ||
 		!TieAppConfig_SetBoolOverride(document, "video.hdr", video->output.hdr, defaults->output.hdr, error))
@@ -1064,8 +1064,8 @@ bool TieAppConfig_SetVideo(TieAppConfigState* state, const TieAppVideoConfig* vi
 
 bool TieAppConfig_RestoreVideo(TieAppConfigState* state, char* error, size_t capacity) {
 	static const char* const paths[] = { "video.fullscreen",
-										 "video.stretch_to_window",
 										 "video.centered_messages",
+										 "video.tftc_cockpits",
 										 "video.hdr",
 										 "video.sdr_content_gamma",
 										 "video.paper_white_nits",

@@ -65,32 +65,49 @@ Modern graphics include:
 
 Two flight display options are available under **Settings > Video > Display**:
 
-- **Widescreen (Stretch Cockpit)** renders flight at 16:9 and stretches the
-  original 4:3 cockpit artwork across the whole frame. The 3D world is not
-  stretched. It is off by default.
+- **TFTC Cockpits** renders flight at 16:9 and replaces the cockpit artwork with a
+  3D cockpit model. It is off by default.
 - **Centered Messages** shows flight messages in the middle of the screen and
-  removes the bottom message bar. It is on by default. With Widescreen enabled,
-  the cockpit artwork also extends down over the area the bar used to occupy.
+  removes the bottom message bar. It is on by default.
 
 The classic (original renderer) view is disabled; `TAB` no longer switches to it.
 
-### Wide cockpit art
+### TFTC cockpit models
 
-By default the original 4:3 cockpit art is stretched across the widescreen view. For an undistorted
-result, OpenTIE loads authored 16:9 base art from `resources/cockpit/<view>_wide.png` (for example
-`tieftr12_wide.png`) next to `OpenTIE.exe`. The files must be 456 pixels tall, as in the original art,
-and 811 pixels wide, with one pixel per original pixel. They are used when Widescreen and Centered
-Messages are both on; a missing or wrongly sized file falls back to the stretched art.
+OpenTIE does not ship the cockpit models. With TFTC Cockpits on, it loads XWA-format cockpit OPTs from
+`resources/cockpit3d/` next to `OpenTIE.exe`, named `TieFighterCockpit.opt`, `TieInterceptorCockpit.opt`,
+`TieBomberCockpit.opt`, `TieAdvancedX1Cockpit.opt`, `TieDefenderCockpit.opt`, `AssaultGunboatCockpit.opt` and
+`MissileBoatCockpit.opt`. A craft without a model keeps the cockpit artwork. The models are drawn only with the
+HD flight models, and the first flight with each one takes several seconds to load.
 
-The art is laid out as the original frame split at its thirds (x = 213 and 427): the middle third, with
-the centre console, is unchanged, and the extra 171 pixels are added at the two splits. That widens the
-canopy opening and moves the left and right panels outward. The game moves the gauges, readouts and
-overlays in the left and right thirds by the same amounts, so they stay on their panels.
+With a TFTC cockpit the HUD gains two panels: **Objectives**, the mission goals screen's text, and **Repairs**,
+the damage-control readout. The targeting computer draws without a background, so the target sits on the
+cockpit's own screen.
 
-`cockpit_extract <CP640 dir> <VGA.PAC> <output dir> --no-upscale --no-png --rgba --wide` writes a starting
-point for every view to `<output dir>/wide/`, with the art stretched around the two splits. Front cockpit views
-also get a painted central octagonal pane with struts to the frame (`--no-octagon` skips it). Touch up the
-seams by hand. These files are derived from the original game art, so do not redistribute them.
+### Cockpit editor
+
+The cockpit editor lays out the HUD over a TFTC cockpit. Start it with `--cockpit-editor` (with
+`--skip-to-mission <pilot>` to go straight into flight; the launch configuration "OpenTIE (Release, cockpit
+editor)" does both). Once the cockpit is on screen the editor selects a target, so the targeting computer has
+something to show, and pauses the game. An on-screen panel lists the controls (`H` hides it):
+
+| Control | Effect |
+|---|---|
+| Drag a box | Moves that HUD element or group |
+| Mouse wheel on a box | Scales it; `Shift` + wheel rotates it |
+| Green handles on a box | Right edge sets the width, bottom edge the height, corner both |
+| Right-click a box | Menu: match surface, reset size, reset all; for Objectives also word wrap and headings |
+| Drag **COCKPIT VIEW** (top right) | Slides the cockpit model; mouse wheel on it zooms, right-click resets the view |
+| **PLAY** (under COCKPIT VIEW) | Resumes the game to try the layout; `F12` returns to the editor |
+
+**Match surface** draws an element as if printed on the cockpit surface behind its centre: the element is
+rendered to a texture and projected onto that surface's plane. The 3D view inside the targeting computer stays
+flat. On the Objectives panel the handles set its wrap width and visible height and the wheel scales its text.
+
+Changes save as they are made to `resources/cockpit3d/<Model>.hud.yaml` beside the cockpit model (for example
+`TieFighterCockpit.hud.yaml`), and the layout is used whenever that cockpit is flown. The file holds the view
+(cockpit slide and field of view), the Objectives options, and per element an offset in pixels of the
+640x480 cockpit frame, a horizontal and vertical scale, an angle and whether it matches the surface.
 
 ## Smoother flight
 
@@ -187,6 +204,7 @@ machine.
 | `--skip-to-mission <pilot>` | Loads the named pilot and starts their current tour battle mission, skipping the menus |
 | `--headless` | Creates a hidden window, treats it as always focused, and discards audio |
 | `--capture <file.png> [seconds]` | Saves the flight view as a PNG once flight has run for the given time (default 6), then quits |
+| `--cockpit-editor` | Opens the cockpit editor once a TFTC cockpit is on screen (see [Cockpit editor](#cockpit-editor)) |
 
 For example, `OpenTIE.exe --headless --skip-to-mission PILOT --capture view.png 3`
 saves a flight frame without opening a window.

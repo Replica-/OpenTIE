@@ -10,6 +10,7 @@ typedef struct TieLaunchOptions {
 	bool headless; /* hidden window, always focused */
 	const char* capture_path; /* save the flight view to this PNG, then quit */
 	float capture_after_seconds;
+	bool cockpit_editor; /* open the cockpit editor once a TFTC cockpit is on screen */
 	bool skip_to_mission;
 	const char* skip_pilot; /* pilot file name without .tfr */
 } TieLaunchOptions;

@@ -216,3 +216,94 @@ void festring_hidescreen(void) { blank(); }
 
 // FUNCTION: TIE95 0x239A8
 void festring_showscreen(void) { unblank(); }
+
+#ifdef TIE_MODERN
+static struct {
+	FestringCaptureLine* lines;
+	int capacity;
+	int count;
+	int16_t next_x; /* cursor x where the current line continues */
+	OutCharFunc outchar;
+	int16_t cursorx, cursory, topmargin, bottommargin, leftmargin, rightmargin;
+	uint8_t textcolor, backcolor, dropcolor, fontflag, fontheight, fontlowercase;
+	int16_t lwrapflag, autofillflag, fontcharsize;
+	void* curfontptr;
+} s_capture;
+
+static void festring_captureoutchar(int ch) {
+	if (ch < 0x20 || ch == 0xFE)
+		return; /* line clears and controls draw nothing */
+	FestringCaptureLine* line = s_capture.count ? &s_capture.lines[s_capture.count - 1] : NULL;
+	if (!line || line->y != cursory || s_capture.next_x != cursorx) {
+		if (s_capture.count >= s_capture.capacity)
+			return;
+		line = &s_capture.lines[s_capture.count++];
+		line->x = cursorx;
+		line->y = cursory;
+		line->color = textcolor;
+		line->text[0] = '\0';
+	}
+	size_t length = strlen(line->text);
+	uint8_t current = line->color;
+	for (size_t i = 0; i < length; ++i)
+		if ((uint8_t)line->text[i] == 0xFE && i + 1 < length)
+			current = (uint8_t)line->text[++i];
+	if (current != textcolor && length + 3 < sizeof line->text) {
+		line->text[length++] = (char)0xFE;
+		line->text[length++] = (char)textcolor;
+	}
+	if (length + 1 < sizeof line->text) {
+		line->text[length++] = (char)ch;
+		line->text[length] = '\0';
+	}
+	const uint8_t glyph[2] = { (uint8_t)ch, 0 };
+	cursorx = (int16_t)(cursorx + sys2_calclength(glyph));
+	s_capture.next_x = cursorx;
+}
+
+void festring_capturebegin(FestringCaptureLine* lines, int capacity) {
+	s_capture.lines = lines;
+	s_capture.capacity = capacity;
+	s_capture.count = 0;
+	s_capture.next_x = -1;
+	s_capture.outchar = outchar;
+	s_capture.cursorx = cursorx;
+	s_capture.cursory = cursory;
+	s_capture.topmargin = topmargin;
+	s_capture.bottommargin = bottommargin;
+	s_capture.leftmargin = leftmargin;
+	s_capture.rightmargin = rightmargin;
+	s_capture.textcolor = textcolor;
+	s_capture.backcolor = backcolor;
+	s_capture.dropcolor = dropcolor;
+	s_capture.fontflag = fontflag;
+	s_capture.fontheight = fontheight;
+	s_capture.fontlowercase = fontlowercase;
+	s_capture.lwrapflag = lwrapflag;
+	s_capture.autofillflag = autofillflag;
+	s_capture.fontcharsize = fontcharsize;
+	s_capture.curfontptr = curfontptr;
+	outchar = festring_captureoutchar;
+}
+
+int festring_captureend(void) {
+	outchar = s_capture.outchar;
+	cursorx = s_capture.cursorx;
+	cursory = s_capture.cursory;
+	topmargin = s_capture.topmargin;
+	bottommargin = s_capture.bottommargin;
+	leftmargin = s_capture.leftmargin;
+	rightmargin = s_capture.rightmargin;
+	textcolor = s_capture.textcolor;
+	backcolor = s_capture.backcolor;
+	dropcolor = s_capture.dropcolor;
+	fontflag = s_capture.fontflag;
+	fontheight = s_capture.fontheight;
+	fontlowercase = s_capture.fontlowercase;
+	lwrapflag = s_capture.lwrapflag;
+	autofillflag = s_capture.autofillflag;
+	fontcharsize = s_capture.fontcharsize;
+	curfontptr = s_capture.curfontptr;
+	return s_capture.count;
+}
+#endif

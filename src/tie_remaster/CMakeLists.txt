@@ -2,7 +2,6 @@
 add_library(tie_remaster STATIC
     remaster.c
     capture.c
-    flight/cockpit/wide_png.c
     flight/cockpit/renderer.c
     flight/cockpit/layout.c
     flight/cockpit/text.c
@@ -11,6 +10,8 @@ add_library(tie_remaster STATIC
     flight/classic_lighting.c
     flight/renderer.c
     flight/classic_draw.c
+    flight/cockpit3d.c
+    flight/cockpit/editor.c
     flight/mesh_draw.c
     flight/scene_mesh.c
     flight/line_draw.c
