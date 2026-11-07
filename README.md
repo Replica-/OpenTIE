@@ -84,6 +84,11 @@ With a TFTC cockpit the HUD gains two panels: **Objectives**, the mission goals 
 the damage-control readout. The targeting computer draws without a background, so the target sits on the
 cockpit's own screen.
 
+![TIE fighter TFTC cockpit in flight with an edited HUD layout](assets/opentie-tftc-cockpit.jpg)
+
+*The X-Wing Alliance Upgrade TIE fighter cockpit by DTM (not included with OpenTIE) with an edited HUD: the
+Repairs and Objectives panels drawn onto the side consoles, and the targeting computer without a background.*
+
 ### Cockpit editor
 
 The cockpit editor lays out the HUD over a TFTC cockpit. Start it with `--cockpit-editor` (with
@@ -99,6 +104,11 @@ something to show, and pauses the game. An on-screen panel lists the controls (`
 | Right-click a box | Menu: match surface, reset size, reset all; for Objectives also word wrap and headings |
 | Drag **COCKPIT VIEW** (top right) | Slides the cockpit model; mouse wheel on it zooms, right-click resets the view |
 | **PLAY** (under COCKPIT VIEW) | Resumes the game to try the layout; `F12` returns to the editor |
+
+![The cockpit editor over the TFTC cockpit](assets/opentie-cockpit-editor.jpg)
+
+*The cockpit editor: the help panel (top left), a labelled box over each HUD element, and the COCKPIT VIEW and
+PLAY controls (top right).*
 
 **Match surface** draws an element as if printed on the cockpit surface behind its centre: the element is
 rendered to a texture and projected onto that surface's plane. The 3D view inside the targeting computer stays
